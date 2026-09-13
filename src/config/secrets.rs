@@ -62,7 +62,7 @@ fn check_private(path: &Path) -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
     let mode = std::fs::metadata(path)?.permissions().mode() & 0o777;
     if mode & 0o077 != 0 {
-        return Err(Error::InsecureSecrets {
+        return Err(crate::error::Error::InsecureSecrets {
             path: path.to_path_buf(),
             mode,
         });
