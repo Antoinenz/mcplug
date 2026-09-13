@@ -1,6 +1,7 @@
 pub mod check;
 pub mod scan;
 pub mod servers;
+pub mod update;
 
 use crate::config::Loaded;
 use crate::error::{Error, Result};

@@ -87,6 +87,7 @@ pub async fn build_plan(server: &Server, lock: &LockFile, sources: &Sources, ctx
     let _ = server;
     let mut plan = UpdatePlan { tx_id: super::new_tx_id(), items: Vec::new(), unresolved_deps: Vec::new(), notes: Vec::new() };
     let mut installed = installed_project_ids(lock);
+    let mut queued: HashSet<(SourceKind, String)> = HashSet::new();
     let mut queue: Vec<(PlanRequest, Option<String>)> = requests.into_iter().map(|r| (r, None)).collect();
 
     while let Some((req, dep_of)) = queue.pop() {
@@ -144,10 +145,10 @@ pub async fn build_plan(server: &Server, lock: &LockFile, sources: &Sources, ctx
             }
             let Some(pid) = &d.project_id else { continue };
             let key = (locator.source, pid.clone());
-            if installed.contains(&key) || plan.items.iter().any(|i| i.project.source == key.0 && i.project.id == key.1) {
+            if installed.contains(&key) || queued.contains(&key) {
                 continue;
             }
-            installed.insert(key.clone());
+            queued.insert(key);
             queue.push((PlanRequest::Install { locator: ProjectLocator { source: locator.source, id: pid.clone() }, version_id: None }, Some(name.clone())));
         }
         installed.insert((locator.source, locator.id.clone()));

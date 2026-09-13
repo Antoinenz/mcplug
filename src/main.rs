@@ -28,6 +28,37 @@ enum Cmd {
     },
     /// Check for available updates
     Check { server: Option<String> },
+    /// Update plugins (all with updates, or the named ones)
+    Update {
+        server: String,
+        plugins: Vec<String>,
+        /// Install this exact version id (single plugin only)
+        #[arg(long)]
+        version: Option<String>,
+        #[arg(long)]
+        allow_unverified: bool,
+        /// Don't ask for confirmation
+        #[arg(short, long)]
+        yes: bool,
+        /// Show the plan and stop
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Install a plugin from a URL, `owner/repo`, `hangar:<slug>` or a Modrinth slug
+    Install {
+        server: String,
+        target: String,
+        #[arg(long)]
+        version: Option<String>,
+        #[arg(long)]
+        allow_unverified: bool,
+        #[arg(short, long)]
+        yes: bool,
+    },
+    /// Undo a transaction (default: the last applied one)
+    Revert { server: String, tx: Option<String> },
+    /// Show what mcplug has done to a server
+    History { server: String },
     /// Open the terminal UI (default)
     Tui,
 }
@@ -48,6 +79,14 @@ async fn run(cli: Cli) -> mcplug::Result<()> {
     let ctx = mcplug::cli::Ctx { loaded, http, json: cli.json };
     match cli.cmd.unwrap_or(Cmd::Tui) {
         Cmd::Tui => mcplug::tui::run(ctx).await,
+        Cmd::Update { server, plugins, version, allow_unverified, yes, dry_run } => {
+            mcplug::cli::update::update(&ctx, &mcplug::cli::update::UpdateArgs { server, plugins, version, allow_unverified, yes, dry_run }).await
+        }
+        Cmd::Install { server, target, version, allow_unverified, yes } => {
+            mcplug::cli::update::install(&ctx, &mcplug::cli::update::InstallArgs { server, target, version, allow_unverified, yes }).await
+        }
+        Cmd::Revert { server, tx } => mcplug::cli::update::revert(&ctx, &server, tx.as_deref()).await,
+        Cmd::History { server } => mcplug::cli::update::history(&ctx, &server).await,
         Cmd::Servers => mcplug::cli::servers::run(&ctx).await,
         Cmd::Scan { server, accept_exact } => mcplug::cli::scan::run(&ctx, &mcplug::cli::scan::ScanArgs { server, accept_exact }).await,
         Cmd::Check { server } => {
