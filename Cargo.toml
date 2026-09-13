@@ -19,6 +19,7 @@ toml = "0.8"
 ratatui = "0.29"
 crossterm = { version = "0.28", features = ["event-stream"] }
 futures = "0.3"
+async-trait = "0.1"
 sha1 = "0.10"
 sha2 = "0.10"
 hex = "0.4"

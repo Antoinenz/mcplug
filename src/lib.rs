@@ -8,6 +8,7 @@ pub mod platform;
 pub mod plugins;
 pub mod error;
 pub mod server;
+pub mod sources;
 pub mod util;
 
 pub use error::{Error, Result};
