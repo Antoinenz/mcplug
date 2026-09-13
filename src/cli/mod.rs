@@ -23,6 +23,14 @@ impl Ctx {
         Some(crate::server::mcsm::Mcsm::new(self.http.clone(), &self.loaded.config.mcsmanager.url, &key))
     }
 
+    pub fn control(&self, server: &Server) -> Box<dyn crate::control::ServerControl> {
+        crate::control::for_server(server, self.mcsm(), &self.loaded.secrets)
+    }
+
+    pub fn mcbackup(&self) -> Option<crate::backup::Mcbackup> {
+        crate::backup::Mcbackup::detect(&self.loaded.config.backup.mcbackup)
+    }
+
     pub fn sources(&self) -> Sources {
         let c = &self.loaded.config.sources;
         let s = &self.loaded.secrets;

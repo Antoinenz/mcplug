@@ -1,5 +1,6 @@
 //! mcplug — terminal plugin and server-jar manager for Minecraft servers.
 
+pub mod backup;
 pub mod cli;
 pub mod config;
 pub mod control;

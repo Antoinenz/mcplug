@@ -90,3 +90,60 @@ pub fn set_source(server: &Server, lock: &mut LockFile, name: &str, source: Sour
     entry.source = source;
     lock.save(&server.plugins_dir())
 }
+
+/// Everything around a transaction: backup before, apply, restart, backup after — each step
+/// journaled so the TUI can show what happened.
+pub struct ApplyOptions {
+    pub restart: crate::control::RestartPolicy,
+    pub backup: Option<crate::backup::Mcbackup>,
+    pub control: Box<dyn crate::control::ServerControl>,
+}
+
+pub async fn apply_plan(
+    server: &Server,
+    lock: &mut LockFile,
+    sources: &Sources,
+    plan: &crate::transaction::UpdatePlan,
+    opts: &ApplyOptions,
+    progress: crate::transaction::ProgressFn,
+) -> Result<crate::transaction::TxOutcome> {
+    use crate::transaction::journal::{self, JournalEntry};
+    let (platform, _) = server_platform(server)?;
+    let plugins_dir = server.plugins_dir();
+    let summary = plan.summary();
+    let note = |action: &str, outcome: String, note: Option<String>| {
+        let _ = journal::append(&plugins_dir, &JournalEntry { time: chrono::Utc::now(), tx_id: plan.tx_id.clone(), action: action.into(), outcome, items: vec![], note });
+    };
+
+    if let Some(b) = &opts.backup {
+        progress(crate::transaction::Progress::Step(format!("mcbackup checkpoint {}", server.backup_slug)));
+        match b.checkpoint(&server.backup_slug, &format!("before: {summary}")).await {
+            Ok(out) => note("backup", "checkpoint before".into(), Some(out)),
+            Err(e) => {
+                note("backup", format!("checkpoint failed: {e}"), None);
+                return Err(Error::Msg(format!("backup before update failed, nothing changed: {e}")));
+            }
+        }
+    }
+
+    let outcome = crate::transaction::apply(server, &platform, lock, sources, plan, progress.clone()).await?;
+
+    let log_progress = progress.clone();
+    let log = move |s: String| log_progress(crate::transaction::Progress::Step(s));
+    match crate::control::execute_restart(opts.control.as_ref(), &opts.restart, &summary, &log).await {
+        Ok(()) => note("restart", if opts.restart == crate::control::RestartPolicy::Never { "skipped".into() } else { "restarted".into() }, None),
+        Err(e) => {
+            note("restart", format!("failed: {e}"), Some("jars are in place; restart manually or revert".into()));
+            return Err(Error::Msg(format!("updated, but restart failed: {e}")));
+        }
+    }
+
+    if let (Some(b), false) = (&opts.backup, opts.restart == crate::control::RestartPolicy::Never) {
+        progress(crate::transaction::Progress::Step(format!("mcbackup backup {}", server.backup_slug)));
+        match b.backup(&server.backup_slug, &format!("after: {summary}")).await {
+            Ok(out) => note("backup", "snapshot after".into(), Some(out)),
+            Err(e) => note("backup", format!("snapshot after failed: {e}"), None),
+        }
+    }
+    Ok(outcome)
+}

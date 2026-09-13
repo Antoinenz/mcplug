@@ -16,6 +16,7 @@ pub struct UpdateArgs {
     pub allow_unverified: bool,
     pub yes: bool,
     pub dry_run: bool,
+    pub flow: FlowArgs,
 }
 
 pub struct InstallArgs {
@@ -25,6 +26,24 @@ pub struct InstallArgs {
     pub version: Option<String>,
     pub allow_unverified: bool,
     pub yes: bool,
+    pub flow: FlowArgs,
+}
+
+/// Restart + backup behaviour shared by update and install.
+pub struct FlowArgs {
+    pub restart: String,
+    pub countdown: u32,
+    pub no_backup: bool,
+}
+
+fn apply_options(ctx: &Ctx, server: &crate::server::Server, flow: &FlowArgs) -> Result<ops::ApplyOptions> {
+    let restart = crate::control::RestartPolicy::parse(&flow.restart, flow.countdown).ok_or_else(|| Error::Msg(format!("--restart must be now, when-empty or never (got {:?})", flow.restart)))?;
+    let control = ctx.control(server);
+    if restart != crate::control::RestartPolicy::Never && !control.can_restart() {
+        return Err(Error::Msg(format!("{}: no way to restart this server (control: {}); use --restart never", server.name, control.name())));
+    }
+    let backup = if flow.no_backup { None } else { ctx.mcbackup() };
+    Ok(ops::ApplyOptions { restart, backup, control })
 }
 
 pub async fn update(ctx: &Ctx, a: &UpdateArgs) -> Result<()> {
@@ -58,11 +77,14 @@ pub async fn update(ctx: &Ctx, a: &UpdateArgs) -> Result<()> {
     if plan.is_empty() || a.dry_run {
         return Ok(());
     }
+    let opts = apply_options(ctx, &server, &a.flow)?;
+    describe_flow(&opts);
     if !a.yes && !confirm("apply?")? {
         return Ok(());
     }
-    let out = transaction::apply(&server, &platform, &mut lock, &sources, &plan, Arc::new(cli_progress)).await?;
-    println!("\napplied transaction {} ({} plugin{}). restart {} to load the new versions; `mcplug revert {} {}` undoes it.", out.tx_id, out.applied.len(), if out.applied.len() == 1 { "" } else { "s" }, server.name, server.id, out.tx_id);
+    let _ = platform;
+    let out = ops::apply_plan(&server, &mut lock, &sources, &plan, &opts, Arc::new(cli_progress)).await?;
+    println!("\napplied transaction {} ({} plugin{}).{} `mcplug revert {} {}` undoes it.", out.tx_id, out.applied.len(), if out.applied.len() == 1 { "" } else { "s" }, if opts.restart == crate::control::RestartPolicy::Never { format!(" restart {} to load the new versions.", server.name) } else { String::new() }, server.id, out.tx_id);
     Ok(())
 }
 
@@ -78,11 +100,14 @@ pub async fn install(ctx: &Ctx, a: &InstallArgs) -> Result<()> {
     if plan.is_empty() {
         return Ok(());
     }
+    let opts = apply_options(ctx, &server, &a.flow)?;
+    describe_flow(&opts);
     if !a.yes && !confirm("install?")? {
         return Ok(());
     }
-    let out = transaction::apply(&server, &platform, &mut lock, &sources, &plan, Arc::new(cli_progress)).await?;
-    println!("\ninstalled ({}). restart {} to load it.", out.tx_id, server.name);
+    let _ = platform;
+    let out = ops::apply_plan(&server, &mut lock, &sources, &plan, &opts, Arc::new(cli_progress)).await?;
+    println!("\ninstalled ({}).{}", out.tx_id, if opts.restart == crate::control::RestartPolicy::Never { format!(" restart {} to load it.", server.name) } else { String::new() });
     Ok(())
 }
 
@@ -151,6 +176,21 @@ fn print_plan(plan: &transaction::UpdatePlan) {
     if plan.is_empty() {
         println!("  nothing to do");
     }
+}
+
+fn describe_flow(opts: &ops::ApplyOptions) {
+    println!(
+        "  restart: {}  ·  backup: {}",
+        match &opts.restart {
+            crate::control::RestartPolicy::Now { countdown_secs } => format!("now ({countdown_secs}s countdown, via {})", opts.control.name()),
+            crate::control::RestartPolicy::WhenEmpty { .. } => format!("when empty (via {})", opts.control.name()),
+            crate::control::RestartPolicy::Never => "no (staged)".into(),
+        },
+        match &opts.backup {
+            Some(b) => format!("mcbackup checkpoint before + snapshot after ({})", b.bin.display()),
+            None => "none".into(),
+        }
+    );
 }
 
 fn confirm(q: &str) -> Result<bool> {

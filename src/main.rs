@@ -43,6 +43,8 @@ enum Cmd {
         /// Show the plan and stop
         #[arg(long)]
         dry_run: bool,
+        #[command(flatten)]
+        flow: Flow,
     },
     /// Install a plugin from a URL, `owner/repo`, `hangar:<slug>` or a Modrinth slug
     Install {
@@ -54,6 +56,8 @@ enum Cmd {
         allow_unverified: bool,
         #[arg(short, long)]
         yes: bool,
+        #[command(flatten)]
+        flow: Flow,
     },
     /// Undo a transaction (default: the last applied one)
     Revert { server: String, tx: Option<String> },
@@ -61,6 +65,25 @@ enum Cmd {
     History { server: String },
     /// Open the terminal UI (default)
     Tui,
+}
+
+#[derive(clap::Args)]
+struct Flow {
+    /// When to restart the server: now, when-empty, never
+    #[arg(long, default_value = "never")]
+    restart: String,
+    /// Seconds of in-game warning before a restart
+    #[arg(long, default_value_t = 60)]
+    countdown: u32,
+    /// Skip the mcbackup checkpoint/snapshot even if mcbackup is installed
+    #[arg(long)]
+    no_backup: bool,
+}
+
+impl From<Flow> for mcplug::cli::update::FlowArgs {
+    fn from(f: Flow) -> Self {
+        Self { restart: f.restart, countdown: f.countdown, no_backup: f.no_backup }
+    }
 }
 
 #[tokio::main]
@@ -79,11 +102,11 @@ async fn run(cli: Cli) -> mcplug::Result<()> {
     let ctx = mcplug::cli::Ctx { loaded, http, json: cli.json };
     match cli.cmd.unwrap_or(Cmd::Tui) {
         Cmd::Tui => mcplug::tui::run(ctx).await,
-        Cmd::Update { server, plugins, version, allow_unverified, yes, dry_run } => {
-            mcplug::cli::update::update(&ctx, &mcplug::cli::update::UpdateArgs { server, plugins, version, allow_unverified, yes, dry_run }).await
+        Cmd::Update { server, plugins, version, allow_unverified, yes, dry_run, flow } => {
+            mcplug::cli::update::update(&ctx, &mcplug::cli::update::UpdateArgs { server, plugins, version, allow_unverified, yes, dry_run, flow: flow.into() }).await
         }
-        Cmd::Install { server, target, version, allow_unverified, yes } => {
-            mcplug::cli::update::install(&ctx, &mcplug::cli::update::InstallArgs { server, target, version, allow_unverified, yes }).await
+        Cmd::Install { server, target, version, allow_unverified, yes, flow } => {
+            mcplug::cli::update::install(&ctx, &mcplug::cli::update::InstallArgs { server, target, version, allow_unverified, yes, flow: flow.into() }).await
         }
         Cmd::Revert { server, tx } => mcplug::cli::update::revert(&ctx, &server, tx.as_deref()).await,
         Cmd::History { server } => mcplug::cli::update::history(&ctx, &server).await,
