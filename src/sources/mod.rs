@@ -7,6 +7,7 @@ pub mod http;
 pub mod identify;
 pub mod model;
 pub mod modrinth;
+pub mod resolve;
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -46,6 +47,10 @@ pub trait Source: Send + Sync {
     }
 
     fn http(&self) -> reqwest::Client;
+
+    /// For downcasting to a concrete source when it offers more than the trait (Modrinth's
+    /// bulk update endpoint, collections).
+    fn as_any(&self) -> &dyn std::any::Any;
 }
 
 /// Shared streaming download used by every source.

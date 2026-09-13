@@ -47,6 +47,12 @@ async fn run(cli: Cli) -> mcplug::Result<()> {
     match cli.cmd.unwrap_or(Cmd::Servers) {
         Cmd::Servers => mcplug::cli::servers::run(&ctx).await,
         Cmd::Scan { server, accept_exact } => mcplug::cli::scan::run(&ctx, &mcplug::cli::scan::ScanArgs { server, accept_exact }).await,
-        Cmd::Check { server } => mcplug::cli::check::run(&ctx, server.as_deref()).await,
+        Cmd::Check { server } => {
+            let updates = mcplug::cli::check::run(&ctx, server.as_deref()).await?;
+            if updates {
+                std::process::exit(2);
+            }
+            Ok(())
+        }
     }
 }

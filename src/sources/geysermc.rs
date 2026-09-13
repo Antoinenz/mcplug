@@ -84,6 +84,10 @@ impl Source for GeyserMc {
         self.api.http.clone()
     }
 
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn parse_url(&self, url: &url::Url) -> Option<ProjectLocator> {
         let host = url.host_str()?;
         if !host.ends_with("geysermc.org") {

@@ -79,6 +79,10 @@ impl Source for Modrinth {
         self.api.http.clone()
     }
 
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn parse_url(&self, url: &url::Url) -> Option<ProjectLocator> {
         if url.host_str()? != "modrinth.com" {
             return None;

@@ -44,6 +44,10 @@ impl Source for GitHub {
         self.api.http.clone()
     }
 
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn parse_url(&self, url: &url::Url) -> Option<ProjectLocator> {
         if url.host_str()? != "github.com" {
             return None;
