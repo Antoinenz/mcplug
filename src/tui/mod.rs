@@ -1,6 +1,7 @@
 //! ratatui front end.
 
 mod app;
+mod flow;
 mod screens;
 mod state;
 

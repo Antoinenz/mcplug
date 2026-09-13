@@ -8,10 +8,15 @@ use tokio::sync::mpsc;
 
 pub type JobId = u64;
 
-#[derive(Clone)]
 pub struct JobRunner<M: Send + 'static> {
     tx: mpsc::UnboundedSender<M>,
     next: Arc<AtomicU64>,
+}
+
+impl<M: Send + 'static> Clone for JobRunner<M> {
+    fn clone(&self) -> Self {
+        Self { tx: self.tx.clone(), next: self.next.clone() }
+    }
 }
 
 impl<M: Send + 'static> JobRunner<M> {

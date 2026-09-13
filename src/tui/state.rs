@@ -10,11 +10,21 @@ use crate::sources::resolve::CheckReport;
 use crate::sources::Sources;
 use crate::Result;
 
+use crate::sources::{Candidate, ProjectLocator, ResolvedVersion};
+use crate::transaction::journal::JournalEntry;
+use crate::transaction::{TxOutcome, UpdatePlan};
+
 /// Messages from background jobs.
 pub enum Msg {
     Status { id: String, status: String, players: Option<u32> },
     ScanDone { id: String, result: Result<ScanOutcome> },
     CheckDone { id: String, result: Result<CheckReport> },
+    PlanBuilt { id: String, result: Result<UpdatePlan> },
+    VersionsLoaded { result: Result<Vec<ResolvedVersion>> },
+    SearchDone { result: Result<Vec<Candidate>> },
+    ApplyProgress(String),
+    ApplyDone { id: String, result: Result<TxOutcome>, lock: LockFile },
+    RevertDone { id: String, result: Result<Vec<String>>, lock: LockFile },
     Log(String),
 }
 
@@ -24,6 +34,45 @@ pub enum Screen {
     Detail,
     Identify,
     Help,
+    Review,
+    Restart,
+    Applying,
+    Versions,
+    Search,
+    Journal,
+}
+
+/// What the version picker is choosing a version for.
+#[derive(Debug, Clone)]
+pub enum VersionTarget {
+    /// Change the version of a plan item (index into plan.items).
+    PlanItem(usize),
+    /// Update/downgrade an installed plugin.
+    Plugin(String),
+    /// Install a searched project.
+    Install(ProjectLocator, String),
+}
+
+#[derive(Default)]
+pub struct Flow {
+    pub plan: Option<UpdatePlan>,
+    pub plan_selected: usize,
+    pub restart_choice: usize, // 0 now, 1 when-empty, 2 never
+    pub countdown: u32,
+    pub backup: bool,
+    pub apply_log: Vec<String>,
+    pub applying: bool,
+    pub last_tx: Option<String>,
+    pub versions: Vec<ResolvedVersion>,
+    pub versions_loading: bool,
+    pub version_selected: usize,
+    pub version_target: Option<VersionTarget>,
+    pub search_query: String,
+    pub search_results: Vec<Candidate>,
+    pub search_selected: usize,
+    pub searching: bool,
+    pub journal: Vec<JournalEntry>,
+    pub journal_selected: usize,
 }
 
 pub struct ServerView {
@@ -59,6 +108,8 @@ pub struct State {
     pub mcsm: Option<Arc<Mcsm>>,
     pub should_quit: bool,
     pub toast: Option<(String, std::time::Instant)>,
+    pub loaded: Arc<crate::config::Loaded>,
+    pub flow: Flow,
 }
 
 impl State {

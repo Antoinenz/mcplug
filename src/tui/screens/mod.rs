@@ -1,7 +1,13 @@
+mod applying;
 mod detail;
 mod help;
 mod identify;
+mod journal;
+mod restart;
+mod review;
+mod search;
 mod servers;
+mod versions;
 
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -24,6 +30,30 @@ pub fn render(f: &mut Frame, state: &mut State) {
             servers::render(f, state, body);
             help::render(f, body);
         }
+        Screen::Review => {
+            detail::render(f, state, body);
+            review::render(f, state, body);
+        }
+        Screen::Restart => {
+            detail::render(f, state, body);
+            restart::render(f, state, body);
+        }
+        Screen::Applying => {
+            detail::render(f, state, body);
+            applying::render(f, state, body);
+        }
+        Screen::Versions => {
+            detail::render(f, state, body);
+            versions::render(f, state, body);
+        }
+        Screen::Search => {
+            detail::render(f, state, body);
+            search::render(f, state, body);
+        }
+        Screen::Journal => {
+            detail::render(f, state, body);
+            journal::render(f, state, body);
+        }
     }
     status_bar(f, state, bar);
 }
@@ -34,6 +64,12 @@ fn status_bar(f: &mut Frame, state: &State, area: Rect) {
         Screen::Detail => "↑↓ move  s scan  c check  u update  i identify  m unmanaged  p pin  x ignore  Esc back",
         Screen::Identify => "↑↓ choose  Enter accept  m mark unmanaged  Esc cancel",
         Screen::Help => "any key to close",
+        Screen::Review => "Enter continue  v version  - drop  Esc cancel",
+        Screen::Restart => "↑↓ choose  ←→ countdown  b backup  Enter apply  Esc back",
+        Screen::Applying => "working…",
+        Screen::Versions => "↑↓ choose  Enter select  Esc back",
+        Screen::Search => "type to search  Enter search/select  Esc close",
+        Screen::Journal => "↑↓ move  r revert  Esc back",
     };
     let line = match &state.toast {
         Some((t, _)) => Line::from(vec![Span::styled(format!(" {t} "), Style::default().fg(Color::Black).bg(Color::Yellow))]),

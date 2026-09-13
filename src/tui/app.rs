@@ -20,7 +20,7 @@ use crate::Result;
 
 pub struct App {
     pub state: State,
-    jobs: JobRunner<Msg>,
+    pub(super) jobs: JobRunner<Msg>,
     rx: mpsc::UnboundedReceiver<Msg>,
 }
 
@@ -29,6 +29,7 @@ impl App {
         let (jobs, rx) = JobRunner::new();
         let servers = discover(&ctx.loaded.config).into_iter().map(ServerView::new).collect();
         let mcsm = ctx.mcsm().map(Arc::new);
+        let loaded = Arc::new(ctx.loaded.clone());
         let state = State {
             servers,
             selected: 0,
@@ -40,6 +41,8 @@ impl App {
             mcsm,
             should_quit: false,
             toast: None,
+            loaded,
+            flow: Default::default(),
         };
         Self { state, jobs, rx }
     }
@@ -73,7 +76,7 @@ impl App {
         Ok(())
     }
 
-    fn refresh_status(&self) {
+    pub(super) fn refresh_status(&self) {
         let Some(mcsm) = self.state.mcsm.clone() else { return };
         for v in &self.state.servers {
             let Some(uuid) = v.server.mcsm_uuid().map(str::to_string) else { continue };
@@ -144,6 +147,33 @@ impl App {
                     self.state.toast(n);
                 }
             }
+            Msg::PlanBuilt { id, result } => self.on_plan_built(id, result),
+            Msg::VersionsLoaded { result } => {
+                self.state.flow.versions_loading = false;
+                match result {
+                    Ok(v) => self.state.flow.versions = v,
+                    Err(e) => self.state.toast(format!("could not load versions: {e}")),
+                }
+            }
+            Msg::SearchDone { result } => {
+                self.state.flow.searching = false;
+                self.state.flow.search_selected = 0;
+                match result {
+                    Ok(r) => self.state.flow.search_results = r,
+                    Err(e) => self.state.toast(format!("search failed: {e}")),
+                }
+            }
+            Msg::ApplyProgress(line) => {
+                // "<name>: 42%" lines replace the previous one for the same download
+                let prefix = line.split_once(": ").map(|(p, _)| format!("{p}: "));
+                let log = &mut self.state.flow.apply_log;
+                match (prefix, log.last()) {
+                    (Some(p), Some(last)) if last.starts_with(&p) && (line.ends_with('%') || line.ends_with(" KB")) => *log.last_mut().expect("non-empty") = line,
+                    _ => log.push(line),
+                }
+            }
+            Msg::ApplyDone { id, result, lock } => self.on_apply_done(id, result, lock),
+            Msg::RevertDone { id, result, lock } => self.on_revert_done(id, result, lock),
             Msg::Log(s) => self.state.log(s),
         }
     }
@@ -189,9 +219,19 @@ impl App {
                 KeyCode::Char('m') => self.toggle_unmanaged(),
                 KeyCode::Char('p') => self.toggle_pin(),
                 KeyCode::Char('x') => self.ignore_latest(),
-                KeyCode::Char('u') => self.state.toast("updating is coming in the next milestone"),
+                KeyCode::Char('u') => self.start_update_review(false),
+                KeyCode::Char('U') => self.start_update_review(true),
+                KeyCode::Char('v') => self.open_versions_for_selected(),
+                KeyCode::Char('n') | KeyCode::Char('/') => self.open_search(),
+                KeyCode::Char('l') => self.load_journal(),
                 _ => {}
             },
+            Screen::Review => self.on_key_review(k),
+            Screen::Restart => self.on_key_restart(k),
+            Screen::Applying => self.on_key_applying(k),
+            Screen::Versions => self.on_key_versions(k),
+            Screen::Search => self.on_key_search(k),
+            Screen::Journal => self.on_key_journal(k),
             Screen::Identify => match k.code {
                 KeyCode::Esc | KeyCode::Char('q') => self.state.screen = Screen::Detail,
                 KeyCode::Char('j') | KeyCode::Down => self.state.candidate_selected = self.state.candidate_selected.saturating_add(1),
@@ -256,7 +296,7 @@ impl App {
         });
     }
 
-    fn selected_plugin_name(&self) -> Option<String> {
+    pub(super) fn selected_plugin_name(&self) -> Option<String> {
         self.state.current()?.lock.as_ref()?.plugins.get(self.state.plugin_selected).map(|p| p.name.clone())
     }
 
