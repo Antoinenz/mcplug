@@ -28,11 +28,14 @@ impl Api {
     }
 
     async fn pace(&self) {
+        tracing::trace!("pace: waiting for lock");
         let mut last = self.last.lock().await;
         if let Some(t) = *last {
             let elapsed = t.elapsed();
             if elapsed < self.min_gap {
+                tracing::trace!("pace: sleeping {:?}", self.min_gap - elapsed);
                 tokio::time::sleep(self.min_gap - elapsed).await;
+                tracing::trace!("pace: slept");
             }
         }
         *last = Some(Instant::now());

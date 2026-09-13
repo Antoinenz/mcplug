@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use super::{identify_build, BuildInfo, ServerJarProvider};
+use super::{BuildInfo, ServerJarProvider};
 use crate::lockfile::LockFile;
 use crate::plugins::JarHashes;
 use crate::server::start_command::StartCommand;
@@ -30,8 +30,12 @@ pub async fn status(server: &Server, provider: &dyn ServerJarProvider) -> Result
         .await
         .map_err(|e| Error::Msg(e.to_string()))??;
     let md5 = md5_of(&server.jar_path().expect("jar path"));
-    let installed = identify_build(provider, &mc, &hashes.sha256, md5.as_deref()).await?;
-    let latest_same_mc = provider.latest_build(&mc).await.ok();
+    let builds = provider.builds(&mc).await?;
+    let installed = builds
+        .iter()
+        .find(|b| b.sha256.as_deref().is_some_and(|h| h.eq_ignore_ascii_case(&hashes.sha256)) || (md5.is_some() && b.md5.as_deref() == md5.as_deref()))
+        .cloned();
+    let latest_same_mc = builds.into_iter().next();
     let newest_mc = provider.mc_versions().await.ok().and_then(|v| v.into_iter().next());
     let java_major = match server
         .start_command

@@ -2,6 +2,7 @@ mod applying;
 mod detail;
 mod help;
 mod identify;
+mod jar;
 mod journal;
 mod restart;
 mod review;
@@ -54,6 +55,10 @@ pub fn render(f: &mut Frame, state: &mut State) {
             detail::render(f, state, body);
             journal::render(f, state, body);
         }
+        Screen::Jar => {
+            detail::render(f, state, body);
+            jar::render(f, state, body);
+        }
     }
     status_bar(f, state, bar);
 }
@@ -70,6 +75,7 @@ fn status_bar(f: &mut Frame, state: &State, area: Rect) {
         Screen::Versions => "↑↓ choose  Enter select  Esc back",
         Screen::Search => "type to search  Enter search/select  Esc close",
         Screen::Journal => "↑↓ move  r revert  Esc back",
+        Screen::Jar => "u update to newest build  Esc back",
     };
     let daemon = crate::daemon::DaemonState::load(&crate::daemon::state::path()).describe();
     let line = match &state.toast {

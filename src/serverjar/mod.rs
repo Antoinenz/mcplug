@@ -43,10 +43,10 @@ pub trait ServerJarProvider: Send + Sync {
 pub fn for_platform(http: reqwest::Client, kind: PlatformKind) -> Option<Box<dyn ServerJarProvider>> {
     match kind {
         PlatformKind::Paper => Some(Box::new(paper::Paper {
-            api: crate::sources::http::Api::new(http, 60, None),
+            api: crate::sources::http::Api::new(http, 300, None),
         })),
         PlatformKind::Purpur => Some(Box::new(purpur::Purpur {
-            api: crate::sources::http::Api::new(http, 60, None),
+            api: crate::sources::http::Api::new(http, 300, None),
         })),
         _ => None,
     }

@@ -53,6 +53,12 @@ pub enum Msg {
         result: Result<Vec<String>>,
         lock: LockFile,
     },
+    JarStatus {
+        result: Result<crate::serverjar::ops::JarStatus>,
+    },
+    JarDone {
+        result: Result<String>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,6 +73,7 @@ pub enum Screen {
     Versions,
     Search,
     Journal,
+    Jar,
 }
 
 /// What the version picker is choosing a version for.
@@ -102,6 +109,8 @@ pub struct Flow {
     pub collections_mode: bool,
     pub journal: Vec<JournalEntry>,
     pub journal_selected: usize,
+    pub jar: Option<crate::serverjar::ops::JarStatus>,
+    pub jar_loading: bool,
 }
 
 pub struct ServerView {

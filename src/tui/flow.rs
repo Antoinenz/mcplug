@@ -540,3 +540,73 @@ impl App {
         }
     }
 }
+
+// ---- server jar ----
+
+impl App {
+    pub fn open_jar(&mut self) {
+        let Some(v) = self.state.current() else { return };
+        let server = v.server.clone();
+        let Some(provider) = crate::serverjar::for_platform(
+            self.state
+                .sources
+                .get(crate::sources::SourceKind::Modrinth)
+                .map(|s| s.http())
+                .unwrap_or_default(),
+            server.platform,
+        ) else {
+            self.state.toast(format!("no build provider for {}", server.platform));
+            return;
+        };
+        self.state.flow.jar = None;
+        self.state.flow.jar_loading = true;
+        self.state.screen = Screen::Jar;
+        self.jobs.spawn(async move {
+            let result = crate::serverjar::ops::status(&server, provider.as_ref()).await;
+            Msg::JarStatus { result }
+        });
+    }
+
+    pub fn on_key_jar(&mut self, k: KeyEvent) {
+        match k.code {
+            KeyCode::Esc | KeyCode::Char('q') => self.state.screen = Screen::Detail,
+            KeyCode::Char('u') => self.update_jar_build(),
+            _ => {}
+        }
+    }
+
+    fn update_jar_build(&mut self) {
+        let Some(st) = self.state.flow.jar.clone() else { return };
+        let Some(latest) = st.latest_same_mc.clone() else { return };
+        if st.installed.as_ref().map(|b| b.build) == Some(latest.build) {
+            self.state.toast("already on the newest build");
+            return;
+        }
+        let Some(v) = self.state.current() else { return };
+        let server = v.server.clone();
+        let control = crate::control::for_server(&server, self.state.mcsm.as_deref().cloned(), &self.state.loaded.secrets);
+        let http = self
+            .state
+            .sources
+            .get(crate::sources::SourceKind::Modrinth)
+            .map(|s| s.http())
+            .unwrap_or_default();
+        let tx = self.jobs.clone();
+        self.state.flow.apply_log.clear();
+        self.state.flow.applying = true;
+        self.state.flow.last_tx = None;
+        self.state.screen = Screen::Applying;
+        self.jobs.spawn(async move {
+            let progress: transaction::ProgressFn = Arc::new(move |p| {
+                let line = match p {
+                    Progress::Step(s) => s,
+                    Progress::Download { name, done, total: Some(t) } => format!("{name}: {}%", done * 100 / t.max(1)),
+                    Progress::Download { name, done, total: None } => format!("{name}: {} KB", done / 1000),
+                };
+                tx.send(Msg::ApplyProgress(line));
+            });
+            let result = crate::serverjar::ops::install_build(&server, control.as_ref(), &latest, &http, progress).await;
+            Msg::JarDone { result }
+        });
+    }
+}

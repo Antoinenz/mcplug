@@ -176,6 +176,27 @@ impl App {
                 }
             }
             Msg::CollectionsLoaded { result } => self.on_collections_loaded(result),
+            Msg::JarStatus { result } => {
+                self.state.flow.jar_loading = false;
+                match result {
+                    Ok(s) => self.state.flow.jar = Some(s),
+                    Err(e) => self.state.toast(format!("server jar: {e}")),
+                }
+            }
+            Msg::JarDone { result } => {
+                self.state.flow.applying = false;
+                self.state.flow.apply_log.push(match result {
+                    Ok(tx) => format!("done: server jar replaced ({tx}). restart the server to run it."),
+                    Err(e) => format!("FAILED: {e}"),
+                });
+                // the server's jar info is stale now; rediscover
+                let cfg = self.state.loaded.config.clone();
+                for fresh in discover(&cfg) {
+                    if let Some(v) = self.state.by_id_mut(&fresh.id) {
+                        v.server = fresh;
+                    }
+                }
+            }
             Msg::ApplyProgress(line) => {
                 // "<name>: 42%" lines replace the previous one for the same download
                 let prefix = line.split_once(": ").map(|(p, _)| format!("{p}: "));
@@ -238,8 +259,10 @@ impl App {
                 KeyCode::Char('v') => self.open_versions_for_selected(),
                 KeyCode::Char('n') | KeyCode::Char('/') => self.open_search(),
                 KeyCode::Char('l') => self.load_journal(),
+                KeyCode::Char('J') => self.open_jar(),
                 _ => {}
             },
+            Screen::Jar => self.on_key_jar(k),
             Screen::Review => self.on_key_review(k),
             Screen::Restart => self.on_key_restart(k),
             Screen::Applying => self.on_key_applying(k),

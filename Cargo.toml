@@ -40,6 +40,8 @@ humansize = "2"
 opt-level = 3
 [profile.dev.package.sha1]
 opt-level = 3
+[profile.dev.package.md-5]
+opt-level = 3
 [profile.dev.package.zip]
 opt-level = 3
 [profile.dev.package.flate2]
