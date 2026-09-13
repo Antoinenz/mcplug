@@ -3,7 +3,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 
 /// `secrets.toml`, 0600. Never merged into the lockfile or journal.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
