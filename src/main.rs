@@ -28,6 +28,8 @@ enum Cmd {
     },
     /// Check for available updates
     Check { server: Option<String> },
+    /// Open the terminal UI (default)
+    Tui,
 }
 
 #[tokio::main]
@@ -44,7 +46,8 @@ async fn run(cli: Cli) -> mcplug::Result<()> {
     let loaded = mcplug::config::Loaded::load(cli.config)?;
     let http = mcplug::http::client(loaded.config.contact.as_deref());
     let ctx = mcplug::cli::Ctx { loaded, http, json: cli.json };
-    match cli.cmd.unwrap_or(Cmd::Servers) {
+    match cli.cmd.unwrap_or(Cmd::Tui) {
+        Cmd::Tui => mcplug::tui::run(ctx).await,
         Cmd::Servers => mcplug::cli::servers::run(&ctx).await,
         Cmd::Scan { server, accept_exact } => mcplug::cli::scan::run(&ctx, &mcplug::cli::scan::ScanArgs { server, accept_exact }).await,
         Cmd::Check { server } => {

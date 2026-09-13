@@ -5,7 +5,6 @@ use std::io::Read;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 use crate::util::McVersion;
 use crate::Result;
@@ -62,7 +61,6 @@ pub struct ServerJarInfo {
     pub mc_version: Option<McVersion>,
     /// From `version.json` — the Java the bundled Minecraft build wants.
     pub java_min: Option<u32>,
-    pub sha256: String,
     pub size: u64,
     /// Build number when derivable from the filename (`paper-26.2-123.jar` → 123).
     pub build_hint: Option<u32>,
@@ -74,14 +72,13 @@ struct VersionJson {
     java_version: Option<u32>,
 }
 
+/// Reads only the zip central directory plus three small entries — cheap even for a 60 MB
+/// jar. Hashing (needed to match a build against the provider's list) is done on demand with
+/// [`crate::plugins::JarHashes::of_file`].
 pub fn inspect_server_jar(path: &Path) -> Result<ServerJarInfo> {
-    let mut file = File::open(path)?;
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)?;
-    let sha256 = hex::encode(Sha256::digest(&bytes));
-    let size = bytes.len() as u64;
-    let cursor = std::io::Cursor::new(bytes);
-    let mut zip = zip::ZipArchive::new(cursor)?;
+    let file = File::open(path)?;
+    let size = file.metadata()?.len();
+    let mut zip = zip::ZipArchive::new(file)?;
 
     let version_json: Option<VersionJson> =
         read_entry(&mut zip, "version.json").and_then(|s| serde_json::from_str(&s).ok());
@@ -113,7 +110,6 @@ pub fn inspect_server_jar(path: &Path) -> Result<ServerJarInfo> {
         platform,
         mc_version,
         java_min,
-        sha256,
         size,
     })
 }

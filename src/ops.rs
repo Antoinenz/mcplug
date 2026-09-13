@@ -51,19 +51,27 @@ pub async fn scan_server(server: &Server, sources: &Sources, accept_exact: bool)
     lock.plugins.retain(|p| present.contains(&p.hashes.sha512));
     for id in &report.identified {
         let entry = identify::entry_for(id);
-        lock.plugins.retain(|p| p.name != entry.name || p.hashes.sha512 == entry.hashes.sha512);
+        lock.plugins.retain(|p| p.name != entry.name);
         lock.plugins.push(entry);
     }
     for u in &report.undecided {
         let entry = identify::unidentified_entry(&u.jar);
-        lock.plugins.retain(|p| p.name != entry.name || p.hashes.sha512 == entry.hashes.sha512);
+        lock.plugins.retain(|p| p.name != entry.name);
         lock.plugins.push(entry);
     }
     lock.plugins.sort_by(|a, b| a.name.to_ascii_lowercase().cmp(&b.name.to_ascii_lowercase()));
     lock.server.platform = Some(server.platform);
     lock.server.mc_version = Some(cctx.mc_version.clone());
     lock.server.last_scan = Some(chrono::Utc::now());
-    lock.server.jar = server.jar.as_ref().map(|j| LockServerJar { provider: j.platform.to_string(), file: j.file_name.clone(), build: j.build_hint, sha256: j.sha256.clone() });
+    lock.server.jar = match (&server.jar, server.jar_path()) {
+        (Some(j), Some(path)) => Some(LockServerJar {
+            provider: j.platform.to_string(),
+            file: j.file_name.clone(),
+            build: j.build_hint,
+            sha256: crate::plugins::JarHashes::of_file(&path).map(|h| h.sha256).unwrap_or_default(),
+        }),
+        _ => None,
+    };
     let saved = server.access.writable();
     if saved {
         lock.save(&plugins_dir)?;

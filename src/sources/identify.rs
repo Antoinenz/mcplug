@@ -51,6 +51,8 @@ pub async fn identify(sources: &Sources, lock: &LockFile, jars: Vec<ScannedJar>,
             continue;
         }
         match lock.by_sha512(&jar.hashes.sha512) {
+            // Still unidentified: search again, the user may have a decision to make.
+            Some(e) if matches!(e.source, SourceRef::Unidentified) => pending.push(jar),
             // Known and untouched — including ones the user marked unmanaged.
             Some(_) => report.unchanged.push(jar),
             None => pending.push(jar),

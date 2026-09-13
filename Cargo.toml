@@ -34,6 +34,16 @@ glob-match = "0.2"
 humantime = "2"
 humansize = "2"
 
+# Hashing 60 MB jars in an unoptimised build takes tens of seconds; keep the digest crates fast.
+[profile.dev.package.sha2]
+opt-level = 3
+[profile.dev.package.sha1]
+opt-level = 3
+[profile.dev.package.zip]
+opt-level = 3
+[profile.dev.package.flate2]
+opt-level = 3
+
 [profile.release]
 lto = true
 codegen-units = 1
