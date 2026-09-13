@@ -4,6 +4,7 @@ pub mod cli;
 pub mod config;
 pub mod http;
 pub mod lockfile;
+pub mod ops;
 pub mod platform;
 pub mod plugins;
 pub mod error;

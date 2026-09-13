@@ -1,10 +1,8 @@
-use crate::lockfile::{LockFile, LockServerJar};
-use crate::plugins::scan_plugins;
-use crate::sources::identify::{self, IdentifyOptions};
+use crate::ops;
 use crate::sources::Confidence;
 use crate::Result;
 
-use super::{server_platform, Ctx};
+use super::Ctx;
 
 pub struct ScanArgs {
     pub server: String,
@@ -14,48 +12,21 @@ pub struct ScanArgs {
 
 pub async fn run(ctx: &Ctx, args: &ScanArgs) -> Result<()> {
     let server = ctx.server(&args.server)?;
-    let (platform, cctx) = server_platform(&server)?;
-    let plugins_dir = server.plugins_dir();
-    let scan = scan_plugins(&platform, &plugins_dir);
-    for e in &scan.errors {
-        eprintln!("warning: {e}");
-    }
-    let mut lock = LockFile::load_or_new(&plugins_dir)?;
     let sources = ctx.sources();
-    let report = identify::identify(&sources, &lock, scan.jars, &cctx, &IdentifyOptions { accept_exact_name: args.accept_exact }).await;
-    for e in &report.errors {
+    let out = ops::scan_server(&server, &sources, args.accept_exact).await?;
+    for e in out.scan.errors.iter().chain(out.report.errors.iter()) {
         eprintln!("warning: {e}");
     }
-
-    // Update the lock: drop entries whose jar is gone, add identified, record unidentified.
-    let present: std::collections::HashSet<String> = report.unchanged.iter().chain(report.identified.iter().map(|i| &i.jar)).chain(report.undecided.iter().map(|u| &u.jar)).map(|j| j.hashes.sha512.clone()).collect();
-    lock.plugins.retain(|p| present.contains(&p.hashes.sha512));
-    for id in &report.identified {
-        let entry = identify::entry_for(id);
-        lock.plugins.retain(|p| p.name != entry.name);
-        lock.plugins.push(entry);
+    if !out.saved {
+        eprintln!("note: lock not written — {}", match &server.access { crate::server::Access::ReadOnly { reason } => reason.clone(), _ => "plugin dir missing".into() });
     }
-    for u in &report.undecided {
-        let entry = identify::unidentified_entry(&u.jar);
-        lock.plugins.retain(|p| p.name != entry.name);
-        lock.plugins.push(entry);
-    }
-    lock.plugins.sort_by(|a, b| a.name.to_ascii_lowercase().cmp(&b.name.to_ascii_lowercase()));
-    lock.server.platform = Some(server.platform);
-    lock.server.mc_version = Some(cctx.mc_version.clone());
-    lock.server.last_scan = Some(chrono::Utc::now());
-    lock.server.jar = server.jar.as_ref().map(|j| LockServerJar { provider: j.platform.to_string(), file: j.file_name.clone(), build: j.build_hint, sha256: j.sha256.clone() });
-    if server.access.writable() {
-        lock.save(&plugins_dir)?;
-    } else {
-        eprintln!("note: {} — lock not written", match &server.access { crate::server::Access::ReadOnly { reason } => reason.clone(), _ => "plugin dir missing".into() });
-    }
-
     if ctx.json {
-        println!("{}", serde_json::to_string_pretty(&lock)?);
+        println!("{}", serde_json::to_string_pretty(&out.lock)?);
         return Ok(());
     }
-    println!("{} ({} {}) — {} plugins, {} unchanged, {} identified, {} need a decision, {} skipped", server.name, server.platform, cctx.mc_version, lock.plugins.len(), report.unchanged.len(), report.identified.len(), report.undecided.len(), report.skipped.len());
+    let (scan, report, lock) = (&out.scan, &out.report, &out.lock);
+    let mc = lock.server.mc_version.as_ref().map(|v| v.to_string()).unwrap_or_default();
+    println!("{} ({} {}) — {} plugins, {} unchanged, {} identified, {} need a decision, {} skipped", server.name, server.platform, mc, lock.plugins.len(), report.unchanged.len(), report.identified.len(), report.undecided.len(), report.skipped.len());
     if !scan.duplicates.is_empty() {
         println!("  ! duplicate plugins (two jars with the same name): {}", scan.duplicates.join(", "));
     }
@@ -78,7 +49,7 @@ pub async fn run(ctx: &Ctx, args: &ScanArgs) -> Result<()> {
     Ok(())
 }
 
-fn confidence_str(c: Confidence) -> &'static str {
+pub fn confidence_str(c: Confidence) -> &'static str {
     match c {
         Confidence::HashConfirmed => "hash-match",
         Confidence::ExactName => "exact-name",

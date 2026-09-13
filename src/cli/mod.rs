@@ -4,10 +4,10 @@ pub mod servers;
 
 use crate::config::Loaded;
 use crate::error::{Error, Result};
-use crate::lockfile::CompatMode;
-use crate::platform::{self, Platform};
 use crate::server::{discover, Server};
-use crate::sources::{CompatCtx, Sources};
+use crate::sources::Sources;
+
+pub use crate::ops::server_platform;
 
 /// Shared context for CLI commands.
 pub struct Ctx {
@@ -55,21 +55,4 @@ impl Ctx {
             _ => Err(Error::Msg(format!("{query:?} is ambiguous: {}", m.iter().map(|s| s.id.as_str()).collect::<Vec<_>>().join(", ")))),
         }
     }
-}
-
-/// Platform + compatibility context for a server, or an error if we can't manage it.
-pub fn server_platform(server: &Server) -> Result<(platform::bukkit::Bukkit, CompatCtx)> {
-    let p = platform::for_kind(server.platform).ok_or_else(|| Error::Msg(format!("{}: platform {} is not supported yet", server.id, server.platform)))?;
-    let mc = server
-        .jar
-        .as_ref()
-        .and_then(|j| j.mc_version.clone())
-        .ok_or_else(|| Error::Msg(format!("{}: could not determine the Minecraft version from the server jar", server.id)))?;
-    let ctx = CompatCtx {
-        mc_version: mc,
-        loaders: p.modrinth_loaders().iter().map(|s| s.to_string()).collect(),
-        hangar_platform: p.hangar_platform().map(str::to_string),
-        mode: CompatMode::Strict,
-    };
-    Ok((p, ctx))
 }

@@ -1,6 +1,6 @@
-use crate::lockfile::{CompatMode, LockFile};
+use crate::lockfile::LockFile;
+use crate::ops;
 use crate::server::discover;
-use crate::sources::resolve;
 use crate::Result;
 
 use super::{server_platform, Ctx};
@@ -22,7 +22,7 @@ pub async fn run(ctx: &Ctx, server: Option<&str>) -> Result<bool> {
             }
             continue;
         };
-        let report = resolve::check(&sources, &lock, &cctx, CompatMode::Strict).await;
+        let report = ops::check_server(s, &sources, &lock).await?;
         any |= !report.updates.is_empty();
         if ctx.json {
             all_json.push(serde_json::json!({ "server": s.id, "report": report }));
