@@ -163,6 +163,7 @@ impl App {
                     Err(e) => self.state.toast(format!("search failed: {e}")),
                 }
             }
+            Msg::CollectionsLoaded { result } => self.on_collections_loaded(result),
             Msg::ApplyProgress(line) => {
                 // "<name>: 42%" lines replace the previous one for the same download
                 let prefix = line.split_once(": ").map(|(p, _)| format!("{p}: "));

@@ -306,11 +306,70 @@ impl App {
         self.state.flow.search_query.clear();
         self.state.flow.search_results.clear();
         self.state.flow.search_selected = 0;
+        self.state.flow.collections_mode = false;
         self.state.screen = Screen::Search;
     }
 
+    /// Ctrl-L in search: list the signed-in Modrinth user's collections; Enter on one lists its projects.
+    fn load_collections(&mut self) {
+        let Some(token) = self.state.loaded.secrets.modrinth_token.clone().filter(|t| !t.is_empty()) else {
+            self.state.toast("no Modrinth token — run `mcplug auth modrinth <token>` (needs COLLECTION_READ + USER_READ)");
+            return;
+        };
+        self.state.flow.searching = true;
+        self.state.flow.search_results.clear();
+        let http = self.state.sources.get(crate::sources::SourceKind::Modrinth).map(|s| s.http()).unwrap_or_default();
+        self.jobs.spawn(async move {
+            let m = crate::sources::modrinth::Modrinth::new(http, Some(token));
+            Msg::CollectionsLoaded { result: m.my_collections().await }
+        });
+    }
+
+    pub fn on_collections_loaded(&mut self, result: crate::Result<Vec<crate::sources::modrinth::Collection>>) {
+        self.state.flow.searching = false;
+        match result {
+            Ok(c) if c.is_empty() => self.state.toast("no collections on this Modrinth account"),
+            Ok(c) => {
+                self.state.flow.collections = c;
+                self.state.flow.collections_mode = true;
+                self.state.flow.search_selected = 0;
+                self.state.flow.search_query = "(collections — Enter to open one)".into();
+            }
+            Err(e) => self.state.toast(format!("collections: {e}")),
+        }
+    }
+
+    fn open_collection(&mut self, idx: usize) {
+        let Some(c) = self.state.flow.collections.get(idx).cloned() else { return };
+        let Some(token) = self.state.loaded.secrets.modrinth_token.clone() else { return };
+        self.state.flow.collections_mode = false;
+        self.state.flow.searching = true;
+        self.state.flow.search_query = format!("collection: {}", c.name);
+        let http = self.state.sources.get(crate::sources::SourceKind::Modrinth).map(|s| s.http()).unwrap_or_default();
+        self.jobs.spawn(async move {
+            let m = crate::sources::modrinth::Modrinth::new(http, Some(token));
+            let result = m.projects(&c.project_ids).await.map(|ps| ps.into_iter().map(|p| crate::sources::Candidate { project: p, confidence: crate::sources::Confidence::NameMatch, version: None }).collect());
+            Msg::SearchDone { result }
+        });
+    }
+
     pub fn on_key_search(&mut self, k: KeyEvent) {
+        if self.state.flow.collections_mode {
+            let n = self.state.flow.collections.len();
+            match k.code {
+                KeyCode::Esc => self.open_search(),
+                KeyCode::Down | KeyCode::Char('j') if n > 0 => self.state.flow.search_selected = (self.state.flow.search_selected + 1) % n,
+                KeyCode::Up | KeyCode::Char('k') if n > 0 => self.state.flow.search_selected = (self.state.flow.search_selected + n - 1) % n,
+                KeyCode::Enter if n > 0 => self.open_collection(self.state.flow.search_selected),
+                _ => {}
+            }
+            return;
+        }
         let n = self.state.flow.search_results.len();
+        if k.code == KeyCode::Char('l') && k.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+            self.load_collections();
+            return;
+        }
         match k.code {
             KeyCode::Esc => self.state.screen = Screen::Detail,
             KeyCode::Down => {

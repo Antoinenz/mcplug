@@ -22,6 +22,7 @@ pub enum Msg {
     PlanBuilt { id: String, result: Result<UpdatePlan> },
     VersionsLoaded { result: Result<Vec<ResolvedVersion>> },
     SearchDone { result: Result<Vec<Candidate>> },
+    CollectionsLoaded { result: Result<Vec<crate::sources::modrinth::Collection>> },
     ApplyProgress(String),
     ApplyDone { id: String, result: Result<TxOutcome>, lock: LockFile },
     RevertDone { id: String, result: Result<Vec<String>>, lock: LockFile },
@@ -71,6 +72,8 @@ pub struct Flow {
     pub search_results: Vec<Candidate>,
     pub search_selected: usize,
     pub searching: bool,
+    pub collections: Vec<crate::sources::modrinth::Collection>,
+    pub collections_mode: bool,
     pub journal: Vec<JournalEntry>,
     pub journal_selected: usize,
 }

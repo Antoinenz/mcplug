@@ -1,3 +1,4 @@
+pub mod auth;
 pub mod check;
 pub mod scan;
 pub mod servers;
