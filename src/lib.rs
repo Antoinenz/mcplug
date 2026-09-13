@@ -12,6 +12,7 @@ pub mod plugins;
 pub mod error;
 pub mod server;
 pub mod sources;
+pub mod transaction;
 pub mod tui;
 pub mod util;
 
