@@ -73,7 +73,11 @@ impl ServerControl for RconControl {
         self.restart_command.is_some()
     }
     async fn status(&self) -> Result<ServerStatus> {
-        Ok(if self.exec("list").await.is_ok() { ServerStatus::Running } else { ServerStatus::Stopped })
+        Ok(if self.exec("list").await.is_ok() {
+            ServerStatus::Running
+        } else {
+            ServerStatus::Stopped
+        })
     }
     async fn send_command(&self, cmd: &str) -> Result<()> {
         self.exec(cmd).await.map(|_| ())

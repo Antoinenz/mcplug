@@ -27,10 +27,7 @@ impl McVersion {
             Some((n, p)) => (n, Some(p)),
             None => (s, None),
         };
-        let parts: Vec<u32> = nums
-            .split('.')
-            .map(|p| p.parse::<u32>().ok())
-            .collect::<Option<_>>()?;
+        let parts: Vec<u32> = nums.split('.').map(|p| p.parse::<u32>().ok()).collect::<Option<_>>()?;
         if parts.is_empty() || parts.len() > 4 {
             return None;
         }
@@ -40,10 +37,9 @@ impl McVersion {
                 let p = p.to_ascii_lowercase();
                 if let Some(n) = p.strip_prefix("pre") {
                     Some(PreRelease::Pre(n.parse().ok()?))
-                } else if let Some(n) = p.strip_prefix("rc") {
-                    Some(PreRelease::Rc(n.parse().ok()?))
                 } else {
-                    return None;
+                    let n = p.strip_prefix("rc")?;
+                    Some(PreRelease::Rc(n.parse().ok()?))
                 }
             }
         };

@@ -19,9 +19,7 @@ pub fn config_dir() -> PathBuf {
             return home.join(".config").join("mcplug");
         }
     }
-    dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("mcplug")
+    dirs::config_dir().unwrap_or_else(|| PathBuf::from(".")).join("mcplug")
 }
 
 /// Per-machine mutable state (daemon heartbeat, caches).

@@ -11,7 +11,8 @@ use crate::{Error, Result};
 
 /// Platform + compatibility context for a server, or an error if we can't manage it.
 pub fn server_platform(server: &Server) -> Result<(crate::platform::bukkit::Bukkit, CompatCtx)> {
-    let p = crate::platform::for_kind(server.platform).ok_or_else(|| Error::Msg(format!("{}: platform {} is not supported yet", server.id, server.platform)))?;
+    let p =
+        crate::platform::for_kind(server.platform).ok_or_else(|| Error::Msg(format!("{}: platform {} is not supported yet", server.id, server.platform)))?;
     let mc = server
         .jar
         .as_ref()
@@ -39,7 +40,16 @@ pub async fn scan_server(server: &Server, sources: &Sources, accept_exact: bool)
     let plugins_dir = server.plugins_dir();
     let scan = scan_plugins(&platform, &plugins_dir);
     let mut lock = LockFile::load_or_new(&plugins_dir)?;
-    let report = identify::identify(sources, &lock, scan.jars.clone(), &cctx, &IdentifyOptions { accept_exact_name: accept_exact }).await;
+    let report = identify::identify(
+        sources,
+        &lock,
+        scan.jars.clone(),
+        &cctx,
+        &IdentifyOptions {
+            accept_exact_name: accept_exact,
+        },
+    )
+    .await;
 
     let present: std::collections::HashSet<String> = report
         .unchanged
@@ -59,7 +69,7 @@ pub async fn scan_server(server: &Server, sources: &Sources, accept_exact: bool)
         lock.plugins.retain(|p| p.name != entry.name);
         lock.plugins.push(entry);
     }
-    lock.plugins.sort_by(|a, b| a.name.to_ascii_lowercase().cmp(&b.name.to_ascii_lowercase()));
+    lock.plugins.sort_by_key(|a| a.name.to_ascii_lowercase());
     lock.server.platform = Some(server.platform);
     lock.server.mc_version = Some(cctx.mc_version.clone());
     lock.server.last_scan = Some(chrono::Utc::now());
@@ -112,7 +122,17 @@ pub async fn apply_plan(
     let plugins_dir = server.plugins_dir();
     let summary = plan.summary();
     let note = |action: &str, outcome: String, note: Option<String>| {
-        let _ = journal::append(&plugins_dir, &JournalEntry { time: chrono::Utc::now(), tx_id: plan.tx_id.clone(), action: action.into(), outcome, items: vec![], note });
+        let _ = journal::append(
+            &plugins_dir,
+            &JournalEntry {
+                time: chrono::Utc::now(),
+                tx_id: plan.tx_id.clone(),
+                action: action.into(),
+                outcome,
+                items: vec![],
+                note,
+            },
+        );
     };
 
     if let Some(b) = &opts.backup {
@@ -131,7 +151,15 @@ pub async fn apply_plan(
     let log_progress = progress.clone();
     let log = move |s: String| log_progress(crate::transaction::Progress::Step(s));
     match crate::control::execute_restart(opts.control.as_ref(), &opts.restart, &summary, &log).await {
-        Ok(()) => note("restart", if opts.restart == crate::control::RestartPolicy::Never { "skipped".into() } else { "restarted".into() }, None),
+        Ok(()) => note(
+            "restart",
+            if opts.restart == crate::control::RestartPolicy::Never {
+                "skipped".into()
+            } else {
+                "restarted".into()
+            },
+            None,
+        ),
         Err(e) => {
             note("restart", format!("failed: {e}"), Some("jars are in place; restart manually or revert".into()));
             return Err(Error::Msg(format!("updated, but restart failed: {e}")));

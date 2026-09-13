@@ -5,7 +5,7 @@ edition = "2021"
 description = "Terminal plugin and server-jar manager for Minecraft servers (Modrinth, Hangar, GitHub; MCSManager-aware)"
 license = "MIT"
 repository = "https://github.com/Antoinenz/mcplug"
-rust-version = "1.80"
+rust-version = "1.82"
 
 [dependencies]
 anyhow = "1"

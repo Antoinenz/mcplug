@@ -39,8 +39,7 @@ impl Loaded {
     }
 
     pub fn mcsm_api_key(&self) -> Option<String> {
-        self.secrets
-            .mcsm_key_with_fallback(self.config.mcsmanager.api_key_env_file.as_deref())
+        self.secrets.mcsm_key_with_fallback(self.config.mcsmanager.api_key_env_file.as_deref())
     }
 }
 

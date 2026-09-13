@@ -38,6 +38,8 @@ pub fn append(plugins_dir: &Path, entry: &JournalEntry) -> std::io::Result<()> {
 }
 
 pub fn read(plugins_dir: &Path) -> Vec<JournalEntry> {
-    let Ok(text) = std::fs::read_to_string(path(plugins_dir)) else { return vec![] };
+    let Ok(text) = std::fs::read_to_string(path(plugins_dir)) else {
+        return vec![];
+    };
     text.lines().filter_map(|l| serde_json::from_str(l).ok()).collect()
 }

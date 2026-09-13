@@ -33,7 +33,11 @@ impl App {
             .map(|u| u.name.clone())
             .collect();
         if names.is_empty() {
-            self.state.toast(if only_selected { "no update available for this plugin (v picks any version)" } else { "nothing to update" });
+            self.state.toast(if only_selected {
+                "no update available for this plugin (v picks any version)"
+            } else {
+                "nothing to update"
+            });
             return;
         }
         self.build_plan(names.into_iter().map(|name| PlanRequest::UpdateLatest { name }).collect());
@@ -92,7 +96,10 @@ impl App {
                 let idx = self.state.flow.plan_selected;
                 let item = self.state.flow.plan.as_ref().map(|p| p.items[idx].clone());
                 if let Some(item) = item {
-                    let locator = ProjectLocator { source: item.project.source, id: item.project.id.clone() };
+                    let locator = ProjectLocator {
+                        source: item.project.source,
+                        id: item.project.id.clone(),
+                    };
                     self.open_versions(locator, VersionTarget::PlanItem(idx));
                 }
             }
@@ -126,16 +133,26 @@ impl App {
         let server = v.server.clone();
         let id = server.id.clone();
         let restart = match self.state.flow.restart_choice {
-            0 => RestartPolicy::Now { countdown_secs: self.state.flow.countdown },
-            1 => RestartPolicy::WhenEmpty { max_wait: std::time::Duration::from_secs(12 * 3600), countdown_secs: self.state.flow.countdown },
+            0 => RestartPolicy::Now {
+                countdown_secs: self.state.flow.countdown,
+            },
+            1 => RestartPolicy::WhenEmpty {
+                max_wait: std::time::Duration::from_secs(12 * 3600),
+                countdown_secs: self.state.flow.countdown,
+            },
             _ => RestartPolicy::Never,
         };
         let control = crate::control::for_server(&server, self.state.mcsm.as_deref().cloned(), &self.state.loaded.secrets);
         if restart != RestartPolicy::Never && !control.can_restart() {
-            self.state.toast(format!("cannot restart this server (control: {}); choose 'never'", control.name()));
+            self.state
+                .toast(format!("cannot restart this server (control: {}); choose 'never'", control.name()));
             return;
         }
-        let backup = if self.state.flow.backup { crate::backup::Mcbackup::detect(&self.state.loaded.config.backup.mcbackup) } else { None };
+        let backup = if self.state.flow.backup {
+            crate::backup::Mcbackup::detect(&self.state.loaded.config.backup.mcbackup)
+        } else {
+            None
+        };
         let opts = ops::ApplyOptions { restart, backup, control };
         let sources = self.state.sources.clone();
         let tx = self.jobs.clone();
@@ -170,7 +187,11 @@ impl App {
         self.state.flow.apply_log.push(line);
         // Only offer "revert" when the jars were actually swapped.
         let tx = self.state.flow.last_tx.clone().unwrap_or_default();
-        let applied = self.state.by_id_mut(&id).map(|v| transaction::journal::read(&v.server.plugins_dir()).iter().any(|e| e.tx_id == tx && e.outcome == "applied"));
+        let applied = self.state.by_id_mut(&id).map(|v| {
+            transaction::journal::read(&v.server.plugins_dir())
+                .iter()
+                .any(|e| e.tx_id == tx && e.outcome == "applied")
+        });
         if applied != Some(true) {
             self.state.flow.last_tx = None;
         }
@@ -249,14 +270,28 @@ impl App {
     /// `v` on the plugin table: any version of the selected plugin.
     pub fn open_versions_for_selected(&mut self) {
         let Some(name) = self.selected_plugin_name() else { return };
-        let Some(entry) = self.state.current().and_then(|v| v.lock.as_ref()).and_then(|l| l.get(&name)).cloned() else { return };
+        let Some(entry) = self.state.current().and_then(|v| v.lock.as_ref()).and_then(|l| l.get(&name)).cloned() else {
+            return;
+        };
         use crate::lockfile::SourceRef;
         use crate::sources::SourceKind;
         let locator = match &entry.source {
-            SourceRef::Modrinth { project_id, .. } => ProjectLocator { source: SourceKind::Modrinth, id: project_id.clone() },
-            SourceRef::Hangar { slug, .. } => ProjectLocator { source: SourceKind::Hangar, id: slug.clone() },
-            SourceRef::GitHub { owner, repo, .. } => ProjectLocator { source: SourceKind::GitHub, id: format!("{owner}/{repo}") },
-            SourceRef::GeyserMc { project, .. } => ProjectLocator { source: SourceKind::GeyserMc, id: project.clone() },
+            SourceRef::Modrinth { project_id, .. } => ProjectLocator {
+                source: SourceKind::Modrinth,
+                id: project_id.clone(),
+            },
+            SourceRef::Hangar { slug, .. } => ProjectLocator {
+                source: SourceKind::Hangar,
+                id: slug.clone(),
+            },
+            SourceRef::GitHub { owner, repo, .. } => ProjectLocator {
+                source: SourceKind::GitHub,
+                id: format!("{owner}/{repo}"),
+            },
+            SourceRef::GeyserMc { project, .. } => ProjectLocator {
+                source: SourceKind::GeyserMc,
+                id: project.clone(),
+            },
             _ => {
                 self.state.toast(format!("{name}: identify it first (i)"));
                 return;
@@ -291,8 +326,14 @@ impl App {
                         }
                         self.state.screen = Screen::Review;
                     }
-                    Some(VersionTarget::Plugin(name)) => self.build_plan(vec![PlanRequest::UpdateTo { name, version_id: v.version_id }]),
-                    Some(VersionTarget::Install(locator, _)) => self.build_plan(vec![PlanRequest::Install { locator, version_id: Some(v.version_id) }]),
+                    Some(VersionTarget::Plugin(name)) => self.build_plan(vec![PlanRequest::UpdateTo {
+                        name,
+                        version_id: v.version_id,
+                    }]),
+                    Some(VersionTarget::Install(locator, _)) => self.build_plan(vec![PlanRequest::Install {
+                        locator,
+                        version_id: Some(v.version_id),
+                    }]),
                     None => {}
                 }
             }
@@ -313,15 +354,23 @@ impl App {
     /// Ctrl-L in search: list the signed-in Modrinth user's collections; Enter on one lists its projects.
     fn load_collections(&mut self) {
         let Some(token) = self.state.loaded.secrets.modrinth_token.clone().filter(|t| !t.is_empty()) else {
-            self.state.toast("no Modrinth token — run `mcplug auth modrinth <token>` (needs COLLECTION_READ + USER_READ)");
+            self.state
+                .toast("no Modrinth token — run `mcplug auth modrinth <token>` (needs COLLECTION_READ + USER_READ)");
             return;
         };
         self.state.flow.searching = true;
         self.state.flow.search_results.clear();
-        let http = self.state.sources.get(crate::sources::SourceKind::Modrinth).map(|s| s.http()).unwrap_or_default();
+        let http = self
+            .state
+            .sources
+            .get(crate::sources::SourceKind::Modrinth)
+            .map(|s| s.http())
+            .unwrap_or_default();
         self.jobs.spawn(async move {
             let m = crate::sources::modrinth::Modrinth::new(http, Some(token));
-            Msg::CollectionsLoaded { result: m.my_collections().await }
+            Msg::CollectionsLoaded {
+                result: m.my_collections().await,
+            }
         });
     }
 
@@ -341,14 +390,29 @@ impl App {
 
     fn open_collection(&mut self, idx: usize) {
         let Some(c) = self.state.flow.collections.get(idx).cloned() else { return };
-        let Some(token) = self.state.loaded.secrets.modrinth_token.clone() else { return };
+        let Some(token) = self.state.loaded.secrets.modrinth_token.clone() else {
+            return;
+        };
         self.state.flow.collections_mode = false;
         self.state.flow.searching = true;
         self.state.flow.search_query = format!("collection: {}", c.name);
-        let http = self.state.sources.get(crate::sources::SourceKind::Modrinth).map(|s| s.http()).unwrap_or_default();
+        let http = self
+            .state
+            .sources
+            .get(crate::sources::SourceKind::Modrinth)
+            .map(|s| s.http())
+            .unwrap_or_default();
         self.jobs.spawn(async move {
             let m = crate::sources::modrinth::Modrinth::new(http, Some(token));
-            let result = m.projects(&c.project_ids).await.map(|ps| ps.into_iter().map(|p| crate::sources::Candidate { project: p, confidence: crate::sources::Confidence::NameMatch, version: None }).collect());
+            let result = m.projects(&c.project_ids).await.map(|ps| {
+                ps.into_iter()
+                    .map(|p| crate::sources::Candidate {
+                        project: p,
+                        confidence: crate::sources::Confidence::NameMatch,
+                        version: None,
+                    })
+                    .collect()
+            });
             Msg::SearchDone { result }
         });
     }
@@ -404,7 +468,10 @@ impl App {
                 }
                 if n > 0 && !self.state.flow.searching && self.state.flow.search_results.get(self.state.flow.search_selected).is_some() {
                     let c = self.state.flow.search_results[self.state.flow.search_selected].clone();
-                    let loc = ProjectLocator { source: c.project.source, id: c.project.id.clone() };
+                    let loc = ProjectLocator {
+                        source: c.project.source,
+                        id: c.project.id.clone(),
+                    };
                     self.open_versions(loc.clone(), VersionTarget::Install(loc, c.project.name.clone()));
                     return;
                 }
@@ -435,7 +502,12 @@ impl App {
                 }
             }
             all.sort_by(|a, b| b.confidence.cmp(&a.confidence).then(b.project.downloads.cmp(&a.project.downloads)));
-            Msg::SearchDone { result: if all.is_empty() && err.is_some() { Err(err.expect("checked")) } else { Ok(all) } }
+            Msg::SearchDone {
+                result: match err {
+                    Some(e) if all.is_empty() => Err(e),
+                    _ => Ok(all),
+                },
+            }
         });
     }
 

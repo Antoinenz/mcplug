@@ -19,7 +19,10 @@ impl RestartPolicy {
     pub fn parse(s: &str, countdown_secs: u32) -> Option<Self> {
         Some(match s {
             "now" => Self::Now { countdown_secs },
-            "when-empty" | "empty" => Self::WhenEmpty { max_wait: Duration::from_secs(12 * 3600), countdown_secs },
+            "when-empty" | "empty" => Self::WhenEmpty {
+                max_wait: Duration::from_secs(12 * 3600),
+                countdown_secs,
+            },
             "never" | "no" | "none" => Self::Never,
             _ => return None,
         })
@@ -41,7 +44,10 @@ pub async fn execute_restart(control: &dyn ServerControl, policy: &RestartPolicy
                     Some(0) | None => break,
                     Some(n) => {
                         if start.elapsed() > *max_wait {
-                            log(format!("restart: still {n} online after {}; restarting anyway", humantime::format_duration(*max_wait)));
+                            log(format!(
+                                "restart: still {n} online after {}; restarting anyway",
+                                humantime::format_duration(*max_wait)
+                            ));
                             break;
                         }
                         log(format!("restart: waiting for {n} player(s) to leave"));

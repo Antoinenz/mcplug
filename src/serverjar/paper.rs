@@ -63,24 +63,44 @@ impl ServerJarProvider for Paper {
 
     async fn mc_versions(&self) -> Result<Vec<McVersion>> {
         let p: Project = self.api.get_json(BASE, &[]).await?;
-        let mut v: Vec<McVersion> = p.versions.values().flatten().filter_map(|s| McVersion::parse(s)).filter(|v| v.is_release()).collect();
+        let mut v: Vec<McVersion> = p
+            .versions
+            .values()
+            .flatten()
+            .filter_map(|s| McVersion::parse(s))
+            .filter(|v| v.is_release())
+            .collect();
         v.sort();
         v.reverse();
         Ok(v)
     }
 
     async fn builds(&self, mc: &McVersion) -> Result<Vec<BuildInfo>> {
-        let info: VersionInfo = self.api.get_json(&format!("{BASE}/versions/{mc}"), &[]).await.unwrap_or(VersionInfo { java: None });
+        let info: VersionInfo = self
+            .api
+            .get_json(&format!("{BASE}/versions/{mc}"), &[])
+            .await
+            .unwrap_or(VersionInfo { java: None });
         let java_min = info.java.and_then(|j| j.version).and_then(|v| v.minimum);
         let builds: Vec<Build> = self.api.get_json(&format!("{BASE}/versions/{mc}/builds"), &[]).await?;
         let mut out: Vec<BuildInfo> = builds
             .into_iter()
             .filter_map(|b| {
                 let d = b.downloads.get("server:default")?;
-                Some(BuildInfo { mc: mc.clone(), build: b.id, file_name: d.name.clone(), url: d.url.clone(), sha256: Some(d.checksums.sha256.clone()), md5: None, java_min, channel: b.channel.to_ascii_lowercase(), time: b.time })
+                Some(BuildInfo {
+                    mc: mc.clone(),
+                    build: b.id,
+                    file_name: d.name.clone(),
+                    url: d.url.clone(),
+                    sha256: Some(d.checksums.sha256.clone()),
+                    md5: None,
+                    java_min,
+                    channel: b.channel.to_ascii_lowercase(),
+                    time: b.time,
+                })
             })
             .collect();
-        out.sort_by(|a, b| b.build.cmp(&a.build));
+        out.sort_by_key(|b| std::cmp::Reverse(b.build));
         Ok(out)
     }
 }

@@ -9,10 +9,7 @@ pub async fn java_major(java: &str, cwd: Option<&Path>) -> Option<u32> {
     if let Some(d) = cwd {
         cmd.current_dir(d);
     }
-    let out = tokio::time::timeout(std::time::Duration::from_secs(10), cmd.output())
-        .await
-        .ok()?
-        .ok()?;
+    let out = tokio::time::timeout(std::time::Duration::from_secs(10), cmd.output()).await.ok()?.ok()?;
     let text = String::from_utf8_lossy(&out.stderr).to_string() + &String::from_utf8_lossy(&out.stdout);
     parse_java_version_output(&text)
 }

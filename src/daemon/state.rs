@@ -45,7 +45,10 @@ impl DaemonState {
                 if age < chrono::Duration::minutes(3) {
                     format!("daemon: running (tick {}s ago)", age.num_seconds())
                 } else {
-                    format!("daemon: stale (last tick {} ago)", humantime::format_duration(std::time::Duration::from_secs(age.num_seconds().max(0) as u64)))
+                    format!(
+                        "daemon: stale (last tick {} ago)",
+                        humantime::format_duration(std::time::Duration::from_secs(age.num_seconds().max(0) as u64))
+                    )
                 }
             }
             None => "daemon: not running".into(),

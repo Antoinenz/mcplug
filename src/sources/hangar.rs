@@ -21,7 +21,9 @@ pub struct Hangar {
 
 impl Hangar {
     pub fn new(http: reqwest::Client) -> Self {
-        Self { api: Api::new(http, 120, None) }
+        Self {
+            api: Api::new(http, 120, None),
+        }
     }
 }
 
@@ -47,7 +49,10 @@ impl Source for Hangar {
         if segs.len() < 2 || matches!(segs[0], "api" | "staff" | "tools" | "guidelines") {
             return None;
         }
-        Some(ProjectLocator { source: SourceKind::Hangar, id: segs[1].to_string() })
+        Some(ProjectLocator {
+            source: SourceKind::Hangar,
+            id: segs[1].to_string(),
+        })
     }
 
     async fn identify_by_hashes(&self, _hashes: &[JarHashes]) -> Result<HashMap<String, (ProjectRef, ResolvedVersion)>> {
@@ -55,7 +60,10 @@ impl Source for Hangar {
     }
 
     async fn search(&self, query: &str, ctx: &CompatCtx, hashes: Option<&JarHashes>) -> Result<Vec<Candidate>> {
-        let raw: HgList<HgProject> = self.api.get_json(&format!("{V1}/projects"), &[("q", query.to_string()), ("limit", "10".into())]).await?;
+        let raw: HgList<HgProject> = self
+            .api
+            .get_json(&format!("{V1}/projects"), &[("q", query.to_string()), ("limit", "10".into())])
+            .await?;
         let platform = ctx.hangar_platform.clone().unwrap_or_else(|| "PAPER".into());
         let q = query.to_ascii_lowercase();
         let mut out = Vec::new();
@@ -63,7 +71,13 @@ impl Source for Hangar {
             if !p.supported_platforms.as_ref().is_none_or(|m| m.contains_key(&platform)) {
                 continue;
             }
-            let mut confidence = if p.name.to_ascii_lowercase() == q { Confidence::ExactName } else if p.name.to_ascii_lowercase().contains(&q) { Confidence::NameMatch } else { Confidence::Weak };
+            let mut confidence = if p.name.to_ascii_lowercase() == q {
+                Confidence::ExactName
+            } else if p.name.to_ascii_lowercase().contains(&q) {
+                Confidence::NameMatch
+            } else {
+                Confidence::Weak
+            };
             let project: ProjectRef = p.into();
             let mut version = None;
             // Only the strong candidates are worth a second request to confirm by hash.
@@ -89,7 +103,10 @@ impl Source for Hangar {
         let platform = ctx.hangar_platform.clone().unwrap_or_else(|| "PAPER".into());
         let raw: HgList<HgVersion> = self
             .api
-            .get_json(&format!("{V1}/projects/{project_id}/versions"), &[("limit", "25".into()), ("platform", platform.clone())])
+            .get_json(
+                &format!("{V1}/projects/{project_id}/versions"),
+                &[("limit", "25".into()), ("platform", platform.clone())],
+            )
             .await?;
         let mut out = Vec::new();
         for v in raw.result {
@@ -127,7 +144,7 @@ impl Source for Hangar {
                 changelog: v.description,
             });
         }
-        out.sort_by(|a, b| b.published.cmp(&a.published));
+        out.sort_by_key(|v| std::cmp::Reverse(v.published));
         Ok(out)
     }
 }

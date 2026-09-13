@@ -101,12 +101,20 @@ pub async fn identify(sources: &Sources, lock: &LockFile, jars: Vec<ScannedJar>,
             opts.accept_exact_name && c.confidence == Confidence::ExactName && candidates.iter().filter(|x| x.confidence == Confidence::ExactName).count() == 1
         });
         if let Some(c) = hash_confirmed {
-            report.identified.push(Identified { jar, project: c.project.clone(), version: c.version.clone().expect("hash confirmed has version") });
+            report.identified.push(Identified {
+                jar,
+                project: c.project.clone(),
+                version: c.version.clone().expect("hash confirmed has version"),
+            });
         } else if let Some(c) = exact_single {
             // Exact name but the installed build isn't a published file: record the project
             // with a placeholder version; the first "check" will find the newest.
             let placeholder = placeholder_version(&c.project);
-            report.identified.push(Identified { jar, project: c.project.clone(), version: placeholder });
+            report.identified.push(Identified {
+                jar,
+                project: c.project.clone(),
+                version: placeholder,
+            });
         } else {
             report.undecided.push(Undecided { jar, candidates });
         }
@@ -149,8 +157,16 @@ pub fn entry_for(id: &Identified) -> PluginEntry {
 
 pub fn source_ref(p: &ProjectRef, v: &ResolvedVersion) -> SourceRef {
     match p.source {
-        SourceKind::Modrinth => SourceRef::Modrinth { project_id: p.id.clone(), version_id: v.version_id.clone(), version_number: v.version_number.clone() },
-        SourceKind::Hangar => SourceRef::Hangar { slug: p.id.clone(), version_name: v.version_id.clone(), platform: v.loaders.first().cloned().unwrap_or_else(|| "paper".into()).to_ascii_uppercase() },
+        SourceKind::Modrinth => SourceRef::Modrinth {
+            project_id: p.id.clone(),
+            version_id: v.version_id.clone(),
+            version_number: v.version_number.clone(),
+        },
+        SourceKind::Hangar => SourceRef::Hangar {
+            slug: p.id.clone(),
+            version_name: v.version_id.clone(),
+            platform: v.loaders.first().cloned().unwrap_or_else(|| "paper".into()).to_ascii_uppercase(),
+        },
         SourceKind::GitHub => {
             let (owner, repo) = p.id.split_once('/').unwrap_or((&p.id, ""));
             SourceRef::GitHub {
@@ -161,7 +177,11 @@ pub fn source_ref(p: &ProjectRef, v: &ResolvedVersion) -> SourceRef {
                 asset_name: v.primary_file().map(|f| f.name.clone()).unwrap_or_default(),
             }
         }
-        SourceKind::GeyserMc => SourceRef::GeyserMc { project: p.id.clone(), download: v.loaders.first().cloned().unwrap_or_else(|| "spigot".into()), build: v.version_id.parse().ok() },
+        SourceKind::GeyserMc => SourceRef::GeyserMc {
+            project: p.id.clone(),
+            download: v.loaders.first().cloned().unwrap_or_else(|| "spigot".into()),
+            build: v.version_id.parse().ok(),
+        },
     }
 }
 

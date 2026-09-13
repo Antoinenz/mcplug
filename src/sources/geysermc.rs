@@ -37,7 +37,11 @@ impl GeyserMc {
             project_id: project.to_string(),
             version_id: b.build.to_string(),
             version_number: format!("{version} build {}", b.build),
-            channel: if b.channel.as_deref() == Some("experimental") { Channel::Beta } else { Channel::Release },
+            channel: if b.channel.as_deref() == Some("experimental") {
+                Channel::Beta
+            } else {
+                Channel::Release
+            },
             game_versions: vec![],
             loaders: vec![download.to_string()],
             published: b.time,
@@ -95,7 +99,10 @@ impl Source for GeyserMc {
         }
         let path = url.path().to_ascii_lowercase();
         let id = if path.contains("floodgate") { "floodgate" } else { "geyser" };
-        Some(ProjectLocator { source: SourceKind::GeyserMc, id: id.into() })
+        Some(ProjectLocator {
+            source: SourceKind::GeyserMc,
+            id: id.into(),
+        })
     }
 
     async fn identify_by_hashes(&self, hashes: &[JarHashes]) -> Result<HashMap<String, (ProjectRef, ResolvedVersion)>> {
@@ -123,7 +130,11 @@ impl Source for GeyserMc {
         Ok(PROJECTS
             .iter()
             .filter(|p| p.contains(&q) || q.contains(*p))
-            .map(|p| Candidate { project: Self::project_ref(p), confidence: Confidence::NameMatch, version: None })
+            .map(|p| Candidate {
+                project: Self::project_ref(p),
+                confidence: Confidence::NameMatch,
+                version: None,
+            })
             .collect())
     }
 
@@ -135,7 +146,7 @@ impl Source for GeyserMc {
         let (version, builds) = self.builds(project_id).await?;
         let download = if ctx.loaders.iter().any(|l| l == "velocity") { "velocity" } else { "spigot" };
         let mut out: Vec<ResolvedVersion> = builds.iter().filter_map(|b| Self::to_version(project_id, &version, b, download)).collect();
-        out.sort_by(|a, b| b.published.cmp(&a.published));
+        out.sort_by_key(|v| std::cmp::Reverse(v.published));
         Ok(out)
     }
 }

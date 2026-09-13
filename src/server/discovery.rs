@@ -104,7 +104,9 @@ fn discover_mcsm(config: &Config) -> Vec<Server> {
     let mut out = Vec::new();
     for path in entries {
         let Ok(text) = std::fs::read_to_string(&path) else { continue };
-        let Ok(inst) = serde_json::from_str::<McsmInstanceFile>(&text) else { continue };
+        let Ok(inst) = serde_json::from_str::<McsmInstanceFile>(&text) else {
+            continue;
+        };
         let uuid = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
         if config.mcsmanager.ignore.iter().any(|i| i == &inst.nickname || i == &uuid) {
             continue;
@@ -165,7 +167,20 @@ fn build_server(
     };
     let access = Access::probe(&plugins_dir);
     let backup_slug = id.clone();
-    Server { id, name, root, origin, start_command, jar, platform, ping_port, control, backup_slug, access, notes }
+    Server {
+        id,
+        name,
+        root,
+        origin,
+        start_command,
+        jar,
+        platform,
+        ping_port,
+        control,
+        backup_slug,
+        access,
+        notes,
+    }
 }
 
 /// `server.properties` in `cwd`, or one level down (zip imports often keep a top folder).

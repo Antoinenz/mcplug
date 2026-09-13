@@ -74,7 +74,10 @@ fn status_bar(f: &mut Frame, state: &State, area: Rect) {
     let daemon = crate::daemon::DaemonState::load(&crate::daemon::state::path()).describe();
     let line = match &state.toast {
         Some((t, _)) => Line::from(vec![Span::styled(format!(" {t} "), Style::default().fg(Color::Black).bg(Color::Yellow))]),
-        None => Line::from(vec![Span::styled(format!(" {hints}"), Style::default().fg(Color::DarkGray)), Span::styled(format!("   {daemon}"), Style::default().fg(Color::DarkGray))]),
+        None => Line::from(vec![
+            Span::styled(format!(" {hints}"), Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("   {daemon}"), Style::default().fg(Color::DarkGray)),
+        ]),
     };
     f.render_widget(Paragraph::new(line), area);
 }
@@ -82,9 +85,16 @@ fn status_bar(f: &mut Frame, state: &State, area: Rect) {
 pub fn popup(f: &mut Frame, area: Rect, width_pct: u16, height: u16, title: &str) -> Rect {
     let w = area.width * width_pct / 100;
     let h = height.min(area.height.saturating_sub(2));
-    let r = Rect { x: area.x + (area.width - w) / 2, y: area.y + (area.height.saturating_sub(h)) / 2, width: w, height: h };
+    let r = Rect {
+        x: area.x + (area.width - w) / 2,
+        y: area.y + (area.height.saturating_sub(h)) / 2,
+        width: w,
+        height: h,
+    };
     f.render_widget(Clear, r);
-    let block = Block::default().borders(Borders::ALL).title(Span::styled(format!(" {title} "), Style::default().add_modifier(Modifier::BOLD)));
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(Span::styled(format!(" {title} "), Style::default().add_modifier(Modifier::BOLD)));
     let inner = block.inner(r);
     f.render_widget(block, r);
     inner

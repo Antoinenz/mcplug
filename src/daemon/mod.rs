@@ -40,7 +40,11 @@ pub async fn run(ctx: Ctx) -> Result<()> {
 
 async fn tick(ctx: &Ctx, st: &mut DaemonState) -> Result<()> {
     let loaded = crate::config::Loaded::load(Some(ctx.loaded.dir.clone())).unwrap_or_else(|_| ctx.loaded.clone());
-    let ctx = Ctx { loaded, http: ctx.http.clone(), json: false };
+    let ctx = Ctx {
+        loaded,
+        http: ctx.http.clone(),
+        json: false,
+    };
     let sources = Arc::new(ctx.sources());
     let now = chrono::Utc::now();
     for server in discover(&ctx.loaded.config) {
@@ -55,7 +59,16 @@ async fn tick(ctx: &Ctx, st: &mut DaemonState) -> Result<()> {
             if now >= at && !in_quiet_hours(&policy) {
                 let control = ctx.control(&server);
                 let log = |s: String| tracing::info!("[{}] {s}", server.id);
-                match crate::control::execute_restart(control.as_ref(), &RestartPolicy::Now { countdown_secs: policy.countdown }, "scheduled restart for updates", &log).await {
+                match crate::control::execute_restart(
+                    control.as_ref(),
+                    &RestartPolicy::Now {
+                        countdown_secs: policy.countdown,
+                    },
+                    "scheduled restart for updates",
+                    &log,
+                )
+                .await
+                {
                     Ok(()) => note(&server, "restart", "restarted (scheduled)".into(), None),
                     Err(e) => note(&server, "restart", format!("scheduled restart failed: {e}"), None),
                 }
@@ -63,7 +76,9 @@ async fn tick(ctx: &Ctx, st: &mut DaemonState) -> Result<()> {
             }
         }
 
-        let due = entry.last_check.is_none_or(|t| now - t >= chrono::Duration::from_std(policy.check_interval).unwrap_or(chrono::Duration::hours(6)));
+        let due = entry
+            .last_check
+            .is_none_or(|t| now - t >= chrono::Duration::from_std(policy.check_interval).unwrap_or(chrono::Duration::hours(6)));
         if !due {
             continue;
         }
@@ -74,7 +89,9 @@ async fn tick(ctx: &Ctx, st: &mut DaemonState) -> Result<()> {
             }
             continue;
         }
-        let Ok(out) = ops::scan_server(&server, &sources, false).await else { continue };
+        let Ok(out) = ops::scan_server(&server, &sources, false).await else {
+            continue;
+        };
         let lock = out.lock;
         entry.last_check = Some(now);
         let report = match ops::check_server(&server, &sources, &lock).await {
@@ -84,7 +101,11 @@ async fn tick(ctx: &Ctx, st: &mut DaemonState) -> Result<()> {
                 continue;
             }
         };
-        entry.updates_available = report.updates.iter().map(|u| format!("{} {}→{}", u.name, u.installed, u.latest.version_number)).collect();
+        entry.updates_available = report
+            .updates
+            .iter()
+            .map(|u| format!("{} {}→{}", u.name, u.installed, u.latest.version_number))
+            .collect();
         entry.last_result = Some(format!("{} update(s) available", report.updates.len()));
         tracing::info!("[{}] {} update(s) available", server.id, report.updates.len());
         if report.updates.is_empty() || policy.auto_apply == "none" {
@@ -113,13 +134,26 @@ async fn tick(ctx: &Ctx, st: &mut DaemonState) -> Result<()> {
             continue;
         }
         let restart = match policy.restart.as_str() {
-            "now" => RestartPolicy::Now { countdown_secs: policy.countdown },
-            "when-empty" => RestartPolicy::WhenEmpty { max_wait: Duration::from_secs(4 * 3600), countdown_secs: policy.countdown },
+            "now" => RestartPolicy::Now {
+                countdown_secs: policy.countdown,
+            },
+            "when-empty" => RestartPolicy::WhenEmpty {
+                max_wait: Duration::from_secs(4 * 3600),
+                countdown_secs: policy.countdown,
+            },
             _ => RestartPolicy::Never,
         };
         let control = ctx.control(&server);
-        let restart = if restart != RestartPolicy::Never && !control.can_restart() { RestartPolicy::Never } else { restart };
-        let opts = ops::ApplyOptions { restart: restart.clone(), backup: if policy.backup { ctx.mcbackup() } else { None }, control };
+        let restart = if restart != RestartPolicy::Never && !control.can_restart() {
+            RestartPolicy::Never
+        } else {
+            restart
+        };
+        let opts = ops::ApplyOptions {
+            restart: restart.clone(),
+            backup: if policy.backup { ctx.mcbackup() } else { None },
+            control,
+        };
         let sid = server.id.clone();
         let progress: transaction::ProgressFn = Arc::new(move |p| {
             if let Progress::Step(s) = p {
@@ -134,7 +168,12 @@ async fn tick(ctx: &Ctx, st: &mut DaemonState) -> Result<()> {
                 if policy.restart == "scheduled" {
                     let at = next_local_time(&policy.restart_at);
                     entry.pending_restart = Some(at);
-                    note(&server, "restart", format!("scheduled for {}", at.with_timezone(&Local).format("%Y-%m-%d %H:%M")), None);
+                    note(
+                        &server,
+                        "restart",
+                        format!("scheduled for {}", at.with_timezone(&Local).format("%Y-%m-%d %H:%M")),
+                        None,
+                    );
                 }
             }
             Err(e) => entry.last_result = Some(format!("auto-update failed: {e}")),
@@ -159,14 +198,26 @@ fn auto_selectable(u: &UpdateCandidate, lock: &LockFile, policy: &EffectivePolic
 }
 
 fn note(server: &Server, action: &str, outcome: String, note: Option<String>) {
-    let _ = journal::append(&server.plugins_dir(), &JournalEntry { time: chrono::Utc::now(), tx_id: "daemon".into(), action: action.into(), outcome, items: vec![], note });
+    let _ = journal::append(
+        &server.plugins_dir(),
+        &JournalEntry {
+            time: chrono::Utc::now(),
+            tx_id: "daemon".into(),
+            action: action.into(),
+            outcome,
+            items: vec![],
+            note,
+        },
+    );
 }
 
 pub fn in_quiet_hours(policy: &EffectivePolicy) -> bool {
     let now = Local::now().time();
     policy.quiet_hours.iter().any(|range| {
         let Some((a, b)) = range.split_once('-') else { return false };
-        let (Ok(a), Ok(b)) = (NaiveTime::parse_from_str(a.trim(), "%H:%M"), NaiveTime::parse_from_str(b.trim(), "%H:%M")) else { return false };
+        let (Ok(a), Ok(b)) = (NaiveTime::parse_from_str(a.trim(), "%H:%M"), NaiveTime::parse_from_str(b.trim(), "%H:%M")) else {
+            return false;
+        };
         if a <= b {
             now >= a && now < b
         } else {

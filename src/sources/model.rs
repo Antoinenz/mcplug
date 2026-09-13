@@ -104,7 +104,11 @@ impl ResolvedVersion {
         if exact {
             return Compat::Exact;
         }
-        let same_line = self.game_versions.iter().filter_map(|g| McVersion::parse(g)).any(|g| g.same_line(&ctx.mc_version));
+        let same_line = self
+            .game_versions
+            .iter()
+            .filter_map(|g| McVersion::parse(g))
+            .any(|g| g.same_line(&ctx.mc_version));
         match ctx.mode {
             CompatMode::Any => Compat::Lenient,
             CompatMode::Lenient | CompatMode::Inherit if same_line => Compat::Lenient,

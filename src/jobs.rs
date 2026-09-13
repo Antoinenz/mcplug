@@ -15,14 +15,23 @@ pub struct JobRunner<M: Send + 'static> {
 
 impl<M: Send + 'static> Clone for JobRunner<M> {
     fn clone(&self) -> Self {
-        Self { tx: self.tx.clone(), next: self.next.clone() }
+        Self {
+            tx: self.tx.clone(),
+            next: self.next.clone(),
+        }
     }
 }
 
 impl<M: Send + 'static> JobRunner<M> {
     pub fn new() -> (Self, mpsc::UnboundedReceiver<M>) {
         let (tx, rx) = mpsc::unbounded_channel();
-        (Self { tx, next: Arc::new(AtomicU64::new(1)) }, rx)
+        (
+            Self {
+                tx,
+                next: Arc::new(AtomicU64::new(1)),
+            },
+            rx,
+        )
     }
 
     pub fn send(&self, m: M) {

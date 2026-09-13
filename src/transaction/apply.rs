@@ -53,7 +53,14 @@ fn manifest_path(plugins_dir: &Path, tx: &str) -> PathBuf {
 
 /// Run the plan. On any failure before the swap nothing on the server changes; a failure
 /// during the swap is rolled back from the manifest.
-pub async fn apply<P: Platform>(server: &Server, platform: &P, lock: &mut LockFile, sources: &Sources, plan: &UpdatePlan, progress: ProgressFn) -> Result<TxOutcome> {
+pub async fn apply<P: Platform>(
+    server: &Server,
+    platform: &P,
+    lock: &mut LockFile,
+    sources: &Sources,
+    plan: &UpdatePlan,
+    progress: ProgressFn,
+) -> Result<TxOutcome> {
     let plugins_dir = server.plugins_dir();
     if !server.access.writable() {
         return Err(Error::Msg(format!("{}: plugin directory is not writable", server.name)));
@@ -68,12 +75,24 @@ pub async fn apply<P: Platform>(server: &Server, platform: &P, lock: &mut LockFi
     let mut staged: Vec<(usize, PathBuf, JarHashes)> = Vec::new();
     for (i, item) in plan.items.iter().enumerate() {
         progress(Progress::Step(format!("downloading {} {}", item.name, item.to.version_number)));
-        let src = sources.get(item.project.source).ok_or_else(|| Error::Msg(format!("source {} disabled", item.project.source)))?;
+        let src = sources
+            .get(item.project.source)
+            .ok_or_else(|| Error::Msg(format!("source {} disabled", item.project.source)))?;
         let dest = staging.join(&item.file.name);
         let name = item.name.clone();
         let p = progress.clone();
         let hashes = src
-            .download(&item.file, &dest, Box::new(move |done, total| p(Progress::Download { name: name.clone(), done, total })))
+            .download(
+                &item.file,
+                &dest,
+                Box::new(move |done, total| {
+                    p(Progress::Download {
+                        name: name.clone(),
+                        done,
+                        total,
+                    })
+                }),
+            )
             .await
             .map_err(|e| abort(&plugins_dir, &staging, &plan.tx_id, format!("{}: download failed: {e}", item.name)))?;
         if let Err(e) = verify(item, &hashes, &dest, platform) {
@@ -86,7 +105,12 @@ pub async fn apply<P: Platform>(server: &Server, platform: &P, lock: &mut LockFi
     progress(Progress::Step("swapping jars".into()));
     let rb = rollback_dir(&plugins_dir, &plan.tx_id);
     std::fs::create_dir_all(&rb)?;
-    let mut manifest = Manifest { tx_id: plan.tx_id.clone(), time: chrono::Utc::now(), items: Vec::new(), completed: false };
+    let mut manifest = Manifest {
+        tx_id: plan.tx_id.clone(),
+        time: chrono::Utc::now(),
+        items: Vec::new(),
+        completed: false,
+    };
     for (i, dest, hashes) in &staged {
         let item = &plan.items[*i];
         let new_entry = PluginEntry {
@@ -101,7 +125,13 @@ pub async fn apply<P: Platform>(server: &Server, platform: &P, lock: &mut LockFi
             installed_at: Some(chrono::Utc::now()),
             source: preserve_github_glob(source_ref(&item.project, &item.to), item.from.as_ref()),
         };
-        manifest.items.push(ManifestItem { name: item.name.clone(), old_file: item.from.as_ref().map(|f| f.file.clone()), new_file: item.file.name.clone(), old_entry: item.from.clone(), new_entry });
+        manifest.items.push(ManifestItem {
+            name: item.name.clone(),
+            old_file: item.from.as_ref().map(|f| f.file.clone()),
+            new_file: item.file.name.clone(),
+            old_entry: item.from.clone(),
+            new_entry,
+        });
     }
     write_manifest(&plugins_dir, &manifest)?;
 
@@ -127,7 +157,17 @@ pub async fn apply<P: Platform>(server: &Server, platform: &P, lock: &mut LockFi
                     undo_swap(&plugins_dir, &rb, &manifest.items[j]);
                 }
                 let _ = std::fs::remove_dir_all(&staging);
-                let _ = journal::append(&plugins_dir, &JournalEntry { time: chrono::Utc::now(), tx_id: plan.tx_id.clone(), action: "aborted".into(), outcome: format!("swap failed for {}: {e}", m.name), items: vec![], note: None });
+                let _ = journal::append(
+                    &plugins_dir,
+                    &JournalEntry {
+                        time: chrono::Utc::now(),
+                        tx_id: plan.tx_id.clone(),
+                        action: "aborted".into(),
+                        outcome: format!("swap failed for {}: {e}", m.name),
+                        items: vec![],
+                        note: None,
+                    },
+                );
                 return Err(Error::Msg(format!("{}: swap failed: {e} (rolled back)", m.name)));
             }
         }
@@ -141,26 +181,56 @@ pub async fn apply<P: Platform>(server: &Server, platform: &P, lock: &mut LockFi
         lock.plugins.retain(|p| p.name != m.name);
         lock.plugins.push(m.new_entry.clone());
     }
-    lock.plugins.sort_by(|a, b| a.name.to_ascii_lowercase().cmp(&b.name.to_ascii_lowercase()));
+    lock.plugins.sort_by_key(|a| a.name.to_ascii_lowercase());
     lock.save(&plugins_dir)?;
 
     // 5. journal
-    let _ = journal::append(&plugins_dir, &JournalEntry {
-        time: chrono::Utc::now(),
-        tx_id: plan.tx_id.clone(),
-        action: if plan.items.iter().all(|i| i.from.is_none()) { "install".into() } else { "update".into() },
-        outcome: "applied".into(),
-        items: manifest.items.iter().map(|m| JournalItem { name: m.name.clone(), from: m.old_entry.as_ref().map(installed_label), to: installed_label(&m.new_entry), old_file: m.old_file.clone(), new_file: m.new_file.clone() }).collect(),
-        note: None,
-    });
+    let _ = journal::append(
+        &plugins_dir,
+        &JournalEntry {
+            time: chrono::Utc::now(),
+            tx_id: plan.tx_id.clone(),
+            action: if plan.items.iter().all(|i| i.from.is_none()) {
+                "install".into()
+            } else {
+                "update".into()
+            },
+            outcome: "applied".into(),
+            items: manifest
+                .items
+                .iter()
+                .map(|m| JournalItem {
+                    name: m.name.clone(),
+                    from: m.old_entry.as_ref().map(installed_label),
+                    to: installed_label(&m.new_entry),
+                    old_file: m.old_file.clone(),
+                    new_file: m.new_file.clone(),
+                })
+                .collect(),
+            note: None,
+        },
+    );
     prune_rollbacks(&plugins_dir, 5);
-    Ok(TxOutcome { tx_id: plan.tx_id.clone(), applied: manifest.items })
+    Ok(TxOutcome {
+        tx_id: plan.tx_id.clone(),
+        applied: manifest.items,
+    })
 }
 
 /// Clean up a transaction that failed before any swap: nothing on the server changed.
 fn abort(plugins_dir: &Path, staging: &Path, tx: &str, why: String) -> Error {
     let _ = std::fs::remove_dir_all(staging);
-    let _ = journal::append(plugins_dir, &JournalEntry { time: chrono::Utc::now(), tx_id: tx.to_string(), action: "aborted".into(), outcome: why.clone(), items: vec![], note: Some("nothing was changed".into()) });
+    let _ = journal::append(
+        plugins_dir,
+        &JournalEntry {
+            time: chrono::Utc::now(),
+            tx_id: tx.to_string(),
+            action: "aborted".into(),
+            outcome: why.clone(),
+            items: vec![],
+            note: Some("nothing was changed".into()),
+        },
+    );
     Error::Msg(why)
 }
 
@@ -173,16 +243,27 @@ fn verify<P: Platform>(item: &super::PlanItem, got: &JarHashes, path: &Path, pla
     for (want, have) in expected {
         if let Some(w) = want {
             if !w.eq_ignore_ascii_case(have) {
-                return Err(Error::Msg(format!("{}: checksum mismatch for {} (expected {}…, got {}…)", item.name, item.file.name, &w[..12], &have[..12])));
+                return Err(Error::Msg(format!(
+                    "{}: checksum mismatch for {} (expected {}…, got {}…)",
+                    item.name,
+                    item.file.name,
+                    &w[..12],
+                    &have[..12]
+                )));
             }
         }
     }
     let f = std::fs::File::open(path)?;
     let mut zip = zip::ZipArchive::new(f).map_err(|e| Error::Msg(format!("{}: downloaded file is not a jar: {e}", item.name)))?;
-    let d = platform.read_descriptor(&mut zip).ok_or_else(|| Error::Msg(format!("{}: {} has no plugin descriptor for this platform", item.name, item.file.name)))?;
+    let d = platform
+        .read_descriptor(&mut zip)
+        .ok_or_else(|| Error::Msg(format!("{}: {} has no plugin descriptor for this platform", item.name, item.file.name)))?;
     if let Some(from) = &item.from {
         if !d.name.eq_ignore_ascii_case(&from.name) {
-            return Err(Error::Msg(format!("{}: downloaded jar identifies itself as {:?} — wrong file?", item.name, d.name)));
+            return Err(Error::Msg(format!(
+                "{}: downloaded jar identifies itself as {:?} — wrong file?",
+                item.name, d.name
+            )));
         }
     }
     Ok(())
@@ -197,7 +278,18 @@ fn read_descriptor_version<P: Platform>(path: &Path, platform: &P) -> Option<Str
 fn preserve_github_glob(new: crate::lockfile::SourceRef, from: Option<&PluginEntry>) -> crate::lockfile::SourceRef {
     use crate::lockfile::SourceRef;
     match (new, from.map(|f| &f.source)) {
-        (SourceRef::GitHub { owner, repo, tag, asset_name, .. }, Some(SourceRef::GitHub { asset_glob, .. })) => SourceRef::GitHub { owner, repo, asset_glob: asset_glob.clone(), tag, asset_name },
+        (
+            SourceRef::GitHub {
+                owner, repo, tag, asset_name, ..
+            },
+            Some(SourceRef::GitHub { asset_glob, .. }),
+        ) => SourceRef::GitHub {
+            owner,
+            repo,
+            asset_glob: asset_glob.clone(),
+            tag,
+            asset_name,
+        },
         (n, _) => n,
     }
 }
@@ -240,17 +332,30 @@ pub fn revert(server: &Server, lock: &mut LockFile, tx: &str) -> Result<Vec<Stri
         }
         names.push(m.name.clone());
     }
-    lock.plugins.sort_by(|a, b| a.name.to_ascii_lowercase().cmp(&b.name.to_ascii_lowercase()));
+    lock.plugins.sort_by_key(|a| a.name.to_ascii_lowercase());
     lock.save(&plugins_dir)?;
     let _ = std::fs::remove_dir_all(&rb);
-    let _ = journal::append(&plugins_dir, &JournalEntry {
-        time: chrono::Utc::now(),
-        tx_id: tx.to_string(),
-        action: "revert".into(),
-        outcome: "reverted".into(),
-        items: manifest.items.iter().map(|m| JournalItem { name: m.name.clone(), from: Some(installed_label(&m.new_entry)), to: m.old_entry.as_ref().map(installed_label).unwrap_or_else(|| "removed".into()), old_file: Some(m.new_file.clone()), new_file: m.old_file.clone().unwrap_or_default() }).collect(),
-        note: None,
-    });
+    let _ = journal::append(
+        &plugins_dir,
+        &JournalEntry {
+            time: chrono::Utc::now(),
+            tx_id: tx.to_string(),
+            action: "revert".into(),
+            outcome: "reverted".into(),
+            items: manifest
+                .items
+                .iter()
+                .map(|m| JournalItem {
+                    name: m.name.clone(),
+                    from: Some(installed_label(&m.new_entry)),
+                    to: m.old_entry.as_ref().map(installed_label).unwrap_or_else(|| "removed".into()),
+                    old_file: Some(m.new_file.clone()),
+                    new_file: m.old_file.clone().unwrap_or_default(),
+                })
+                .collect(),
+            note: None,
+        },
+    );
     Ok(names)
 }
 

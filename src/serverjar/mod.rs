@@ -1,8 +1,8 @@
 //! Server software: identify the installed build, offer newer builds of the same Minecraft
 //! version, and upgrade to a new Minecraft version deliberately.
 
-pub mod paper;
 pub mod ops;
+pub mod paper;
 pub mod purpur;
 
 use async_trait::async_trait;
@@ -32,14 +32,22 @@ pub trait ServerJarProvider: Send + Sync {
     /// Builds for one version, newest first.
     async fn builds(&self, mc: &McVersion) -> Result<Vec<BuildInfo>>;
     async fn latest_build(&self, mc: &McVersion) -> Result<BuildInfo> {
-        self.builds(mc).await?.into_iter().next().ok_or_else(|| crate::Error::Msg(format!("no builds for {mc}")))
+        self.builds(mc)
+            .await?
+            .into_iter()
+            .next()
+            .ok_or_else(|| crate::Error::Msg(format!("no builds for {mc}")))
     }
 }
 
 pub fn for_platform(http: reqwest::Client, kind: PlatformKind) -> Option<Box<dyn ServerJarProvider>> {
     match kind {
-        PlatformKind::Paper => Some(Box::new(paper::Paper { api: crate::sources::http::Api::new(http, 60, None) })),
-        PlatformKind::Purpur => Some(Box::new(purpur::Purpur { api: crate::sources::http::Api::new(http, 60, None) })),
+        PlatformKind::Paper => Some(Box::new(paper::Paper {
+            api: crate::sources::http::Api::new(http, 60, None),
+        })),
+        PlatformKind::Purpur => Some(Box::new(purpur::Purpur {
+            api: crate::sources::http::Api::new(http, 60, None),
+        })),
         _ => None,
     }
 }
@@ -47,5 +55,7 @@ pub fn for_platform(http: reqwest::Client, kind: PlatformKind) -> Option<Box<dyn
 /// Find the installed build by hash among the provider's builds for that version.
 pub async fn identify_build(provider: &dyn ServerJarProvider, mc: &McVersion, sha256: &str, md5: Option<&str>) -> Result<Option<BuildInfo>> {
     let builds = provider.builds(mc).await?;
-    Ok(builds.into_iter().find(|b| b.sha256.as_deref().is_some_and(|h| h.eq_ignore_ascii_case(sha256)) || (md5.is_some() && b.md5.as_deref() == md5)))
+    Ok(builds
+        .into_iter()
+        .find(|b| b.sha256.as_deref().is_some_and(|h| h.eq_ignore_ascii_case(sha256)) || (md5.is_some() && b.md5.as_deref() == md5)))
 }

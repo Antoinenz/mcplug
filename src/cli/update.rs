@@ -37,10 +37,15 @@ pub struct FlowArgs {
 }
 
 pub fn apply_options(ctx: &Ctx, server: &crate::server::Server, flow: &FlowArgs) -> Result<ops::ApplyOptions> {
-    let restart = crate::control::RestartPolicy::parse(&flow.restart, flow.countdown).ok_or_else(|| Error::Msg(format!("--restart must be now, when-empty or never (got {:?})", flow.restart)))?;
+    let restart = crate::control::RestartPolicy::parse(&flow.restart, flow.countdown)
+        .ok_or_else(|| Error::Msg(format!("--restart must be now, when-empty or never (got {:?})", flow.restart)))?;
     let control = ctx.control(server);
     if restart != crate::control::RestartPolicy::Never && !control.can_restart() {
-        return Err(Error::Msg(format!("{}: no way to restart this server (control: {}); use --restart never", server.name, control.name())));
+        return Err(Error::Msg(format!(
+            "{}: no way to restart this server (control: {}); use --restart never",
+            server.name,
+            control.name()
+        )));
     }
     let backup = if flow.no_backup { None } else { ctx.mcbackup() };
     Ok(ops::ApplyOptions { restart, backup, control })
@@ -55,12 +60,22 @@ pub async fn update(ctx: &Ctx, a: &UpdateArgs) -> Result<()> {
 
     let requests: Vec<PlanRequest> = if a.plugins.is_empty() {
         let report = ops::check_server(&server, &sources, &lock).await?;
-        report.updates.iter().filter(|u| !u.untested).map(|u| PlanRequest::UpdateLatest { name: u.name.clone() }).collect()
+        report
+            .updates
+            .iter()
+            .filter(|u| !u.untested)
+            .map(|u| PlanRequest::UpdateLatest { name: u.name.clone() })
+            .collect()
     } else {
         a.plugins
             .iter()
             .map(|name| {
-                let name = lock.plugins.iter().find(|p| p.name.eq_ignore_ascii_case(name)).map(|p| p.name.clone()).unwrap_or_else(|| name.clone());
+                let name = lock
+                    .plugins
+                    .iter()
+                    .find(|p| p.name.eq_ignore_ascii_case(name))
+                    .map(|p| p.name.clone())
+                    .unwrap_or_else(|| name.clone());
                 match &a.version {
                     Some(v) => PlanRequest::UpdateTo { name, version_id: v.clone() },
                     None => PlanRequest::UpdateLatest { name },
@@ -84,7 +99,19 @@ pub async fn update(ctx: &Ctx, a: &UpdateArgs) -> Result<()> {
     }
     let _ = platform;
     let out = ops::apply_plan(&server, &mut lock, &sources, &plan, &opts, Arc::new(cli_progress)).await?;
-    println!("\napplied transaction {} ({} plugin{}).{} `mcplug revert {} {}` undoes it.", out.tx_id, out.applied.len(), if out.applied.len() == 1 { "" } else { "s" }, if opts.restart == crate::control::RestartPolicy::Never { format!(" restart {} to load the new versions.", server.name) } else { String::new() }, server.id, out.tx_id);
+    println!(
+        "\napplied transaction {} ({} plugin{}).{} `mcplug revert {} {}` undoes it.",
+        out.tx_id,
+        out.applied.len(),
+        if out.applied.len() == 1 { "" } else { "s" },
+        if opts.restart == crate::control::RestartPolicy::Never {
+            format!(" restart {} to load the new versions.", server.name)
+        } else {
+            String::new()
+        },
+        server.id,
+        out.tx_id
+    );
     Ok(())
 }
 
@@ -95,7 +122,18 @@ pub async fn install(ctx: &Ctx, a: &InstallArgs) -> Result<()> {
     let mut lock = LockFile::load_or_new(&plugins_dir)?;
     let sources = ctx.sources();
     let locator = locate(&sources, &a.target)?;
-    let plan = transaction::build_plan(&server, &lock, &sources, &cctx, vec![PlanRequest::Install { locator, version_id: a.version.clone() }], a.allow_unverified).await?;
+    let plan = transaction::build_plan(
+        &server,
+        &lock,
+        &sources,
+        &cctx,
+        vec![PlanRequest::Install {
+            locator,
+            version_id: a.version.clone(),
+        }],
+        a.allow_unverified,
+    )
+    .await?;
     print_plan(&plan);
     if plan.is_empty() {
         return Ok(());
@@ -107,13 +145,23 @@ pub async fn install(ctx: &Ctx, a: &InstallArgs) -> Result<()> {
     }
     let _ = platform;
     let out = ops::apply_plan(&server, &mut lock, &sources, &plan, &opts, Arc::new(cli_progress)).await?;
-    println!("\ninstalled ({}).{}", out.tx_id, if opts.restart == crate::control::RestartPolicy::Never { format!(" restart {} to load it.", server.name) } else { String::new() });
+    println!(
+        "\ninstalled ({}).{}",
+        out.tx_id,
+        if opts.restart == crate::control::RestartPolicy::Never {
+            format!(" restart {} to load it.", server.name)
+        } else {
+            String::new()
+        }
+    );
     Ok(())
 }
 
 pub fn locate(sources: &crate::sources::Sources, target: &str) -> Result<ProjectLocator> {
     if target.starts_with("http://") || target.starts_with("https://") {
-        return sources.locate(target).ok_or_else(|| Error::Msg(format!("{target}: not a Modrinth, Hangar, GitHub or GeyserMC URL")));
+        return sources
+            .locate(target)
+            .ok_or_else(|| Error::Msg(format!("{target}: not a Modrinth, Hangar, GitHub or GeyserMC URL")));
     }
     if let Some((src, id)) = target.split_once(':') {
         let source = match src {
@@ -126,9 +174,15 @@ pub fn locate(sources: &crate::sources::Sources, target: &str) -> Result<Project
         return Ok(ProjectLocator { source, id: id.to_string() });
     }
     if target.matches('/').count() == 1 {
-        return Ok(ProjectLocator { source: crate::sources::SourceKind::GitHub, id: target.to_string() });
+        return Ok(ProjectLocator {
+            source: crate::sources::SourceKind::GitHub,
+            id: target.to_string(),
+        });
     }
-    Ok(ProjectLocator { source: crate::sources::SourceKind::Modrinth, id: target.to_string() })
+    Ok(ProjectLocator {
+        source: crate::sources::SourceKind::Modrinth,
+        id: target.to_string(),
+    })
 }
 
 pub async fn revert(ctx: &Ctx, server: &str, tx: Option<&str>) -> Result<()> {
@@ -137,7 +191,12 @@ pub async fn revert(ctx: &Ctx, server: &str, tx: Option<&str>) -> Result<()> {
     let mut lock = LockFile::load_or_new(&plugins_dir)?;
     let tx = match tx {
         Some(t) => t.to_string(),
-        None => transaction::journal::read(&plugins_dir).into_iter().rev().find(|e| e.outcome == "applied").map(|e| e.tx_id).ok_or_else(|| Error::Msg("no applied transaction to revert".into()))?,
+        None => transaction::journal::read(&plugins_dir)
+            .into_iter()
+            .rev()
+            .find(|e| e.outcome == "applied")
+            .map(|e| e.tx_id)
+            .ok_or_else(|| Error::Msg("no applied transaction to revert".into()))?,
     };
     let names = transaction::revert(&server, &mut lock, &tx)?;
     println!("reverted {tx}: {}", names.join(", "));
@@ -152,7 +211,21 @@ pub async fn history(ctx: &Ctx, server: &str) -> Result<()> {
         return Ok(());
     }
     for e in entries {
-        println!("{}  {:<16} {:<8} {:<9} {}", e.time.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M"), e.tx_id, e.action, e.outcome, e.items.iter().map(|i| match &i.from { Some(f) => format!("{} {f}→{}", i.name, i.to), None => format!("+{} {}", i.name, i.to) }).collect::<Vec<_>>().join(", "));
+        println!(
+            "{}  {:<16} {:<8} {:<9} {}",
+            e.time.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M"),
+            e.tx_id,
+            e.action,
+            e.outcome,
+            e.items
+                .iter()
+                .map(|i| match &i.from {
+                    Some(f) => format!("{} {f}→{}", i.name, i.to),
+                    None => format!("+{} {}", i.name, i.to),
+                })
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
         if let Some(n) = e.note {
             println!("{:>18}  {n}", "");
         }
@@ -168,7 +241,10 @@ fn print_plan(plan: &transaction::UpdatePlan) {
         let from = i.from.as_ref().map(transaction::plan::installed_label).unwrap_or_else(|| "(new)".into());
         let dep = i.dependency_of.as_ref().map(|d| format!("  [required by {d}]")).unwrap_or_default();
         let unv = if i.unverified { "  [no checksum]" } else { "" };
-        println!("  {:<22} {:<22} → {:<22} {:<9} {}{dep}{unv}", i.name, from, i.to.version_number, i.project.source, i.file.name);
+        println!(
+            "  {:<22} {:<22} → {:<22} {:<9} {}{dep}{unv}",
+            i.name, from, i.to.version_number, i.project.source, i.file.name
+        );
     }
     for d in &plan.unresolved_deps {
         println!("  ! unresolved dependency: {d}");

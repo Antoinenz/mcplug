@@ -8,13 +8,19 @@ use super::super::state::State;
 use crate::server::Access;
 
 pub fn render(f: &mut Frame, state: &mut State, area: Rect) {
-    let header = Row::new(["server", "platform", "mc", "status", "players", "plugins", "updates", "access", ""]).style(Style::default().add_modifier(Modifier::BOLD));
+    let header =
+        Row::new(["server", "platform", "mc", "status", "players", "plugins", "updates", "access", ""]).style(Style::default().add_modifier(Modifier::BOLD));
     let rows: Vec<Row> = state
         .servers
         .iter()
         .map(|v| {
             let s = &v.server;
-            let mc = s.jar.as_ref().and_then(|j| j.mc_version.as_ref()).map(|m| m.to_string()).unwrap_or_else(|| "?".into());
+            let mc = s
+                .jar
+                .as_ref()
+                .and_then(|j| j.mc_version.as_ref())
+                .map(|m| m.to_string())
+                .unwrap_or_else(|| "?".into());
             let plugins = v.lock.as_ref().map(|l| l.plugins.len().to_string()).unwrap_or_else(|| "–".into());
             let updates = match &v.check {
                 Some(c) if !c.updates.is_empty() => Span::styled(c.updates.len().to_string(), Style::default().fg(Color::Yellow)),

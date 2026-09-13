@@ -102,9 +102,7 @@ mod tests {
 
     #[test]
     fn finds_java_and_jar() {
-        let c = StartCommand::parse(
-            "/usr/lib/jvm/java-25-openjdk-amd64/bin/java -Xms4096M -Xmx4096M -XX:+UseG1GC -jar paper-26.2-123.jar nogui",
-        );
+        let c = StartCommand::parse("/usr/lib/jvm/java-25-openjdk-amd64/bin/java -Xms4096M -Xmx4096M -XX:+UseG1GC -jar paper-26.2-123.jar nogui");
         assert_eq!(c.java(), Some("/usr/lib/jvm/java-25-openjdk-amd64/bin/java"));
         assert_eq!(c.jar(), Some("paper-26.2-123.jar"));
         assert!(c.with_jar("paper-26.2-130.jar").contains("-jar paper-26.2-130.jar nogui"));

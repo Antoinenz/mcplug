@@ -109,10 +109,9 @@ mod tests {
 
     #[test]
     fn lenient_yaml() {
-        let doc: serde_yaml::Value = serde_yaml::from_str(
-            "name: Vault\nversion: 1.7.3\napi-version: 1.13\nauthor: Sleaker\ndepend: WorldEdit\nsoftdepend: [LuckPerms, Essentials]\n",
-        )
-        .unwrap();
+        let doc: serde_yaml::Value =
+            serde_yaml::from_str("name: Vault\nversion: 1.7.3\napi-version: 1.13\nauthor: Sleaker\ndepend: WorldEdit\nsoftdepend: [LuckPerms, Essentials]\n")
+                .unwrap();
         let d = descriptor_from_yaml(&doc).unwrap();
         assert_eq!(d.name, "Vault");
         assert_eq!(d.version.as_deref(), Some("1.7.3"));
@@ -122,7 +121,10 @@ mod tests {
         assert_eq!(d.softdepend, vec!["LuckPerms", "Essentials"]);
         let b = Bukkit { kind: PlatformKind::Paper };
         assert_eq!(b.descriptor_compat(&d, &McVersion::parse("26.2").unwrap()), DescriptorCompat::Ok);
-        let newer = PluginDescriptor { api_version: Some("26.3".into()), ..d };
+        let newer = PluginDescriptor {
+            api_version: Some("26.3".into()),
+            ..d
+        };
         assert_eq!(b.descriptor_compat(&newer, &McVersion::parse("26.2").unwrap()), DescriptorCompat::TooNew);
     }
 }

@@ -45,7 +45,12 @@ struct Envelope {
 
 impl Mcsm {
     pub fn new(http: reqwest::Client, url: &str, api_key: &str) -> Self {
-        Self { http, url: url.trim_end_matches('/').to_string(), api_key: api_key.to_string(), daemon_id: OnceCell::new() }
+        Self {
+            http,
+            url: url.trim_end_matches('/').to_string(),
+            api_key: api_key.to_string(),
+            daemon_id: OnceCell::new(),
+        }
     }
 
     async fn call(&self, method: reqwest::Method, path: &str, query: &[(&str, &str)], body: Option<Value>) -> Result<Value> {
@@ -60,7 +65,11 @@ impl Mcsm {
         }
         let env: Envelope = req.send().await?.error_for_status()?.json().await?;
         if env.status != 200 {
-            return Err(Error::Msg(format!("MCSManager {path}: status {} {}", env.status, env.data.unwrap_or(Value::Null))));
+            return Err(Error::Msg(format!(
+                "MCSManager {path}: status {} {}",
+                env.status,
+                env.data.unwrap_or(Value::Null)
+            )));
         }
         Ok(env.data.unwrap_or(Value::Null))
     }
@@ -81,26 +90,42 @@ impl Mcsm {
 
     pub async fn status(&self, uuid: &str) -> Result<InstanceStatus> {
         let d = self.daemon_id().await?;
-        let v = self.call(reqwest::Method::GET, "/api/instance", &[("uuid", uuid), ("daemonId", &d)], None).await?;
+        let v = self
+            .call(reqwest::Method::GET, "/api/instance", &[("uuid", uuid), ("daemonId", &d)], None)
+            .await?;
         Ok(InstanceStatus::from_code(v["status"].as_i64().unwrap_or(99)))
     }
 
     /// Player count as reported by the panel's own ping, if it has one.
     pub async fn panel_players(&self, uuid: &str) -> Result<Option<u32>> {
         let d = self.daemon_id().await?;
-        let v = self.call(reqwest::Method::GET, "/api/instance", &[("uuid", uuid), ("daemonId", &d)], None).await?;
+        let v = self
+            .call(reqwest::Method::GET, "/api/instance", &[("uuid", uuid), ("daemonId", &d)], None)
+            .await?;
         Ok(v["info"]["currentPlayers"].as_i64().filter(|n| *n >= 0).map(|n| n as u32))
     }
 
     pub async fn command(&self, uuid: &str, cmd: &str) -> Result<()> {
         let d = self.daemon_id().await?;
-        self.call(reqwest::Method::POST, "/api/protected_instance/command", &[("uuid", uuid), ("daemonId", &d), ("command", cmd)], None).await?;
+        self.call(
+            reqwest::Method::POST,
+            "/api/protected_instance/command",
+            &[("uuid", uuid), ("daemonId", &d), ("command", cmd)],
+            None,
+        )
+        .await?;
         Ok(())
     }
 
     async fn simple(&self, uuid: &str, action: &str) -> Result<()> {
         let d = self.daemon_id().await?;
-        self.call(reqwest::Method::POST, &format!("/api/protected_instance/{action}"), &[("uuid", uuid), ("daemonId", &d)], None).await?;
+        self.call(
+            reqwest::Method::POST,
+            &format!("/api/protected_instance/{action}"),
+            &[("uuid", uuid), ("daemonId", &d)],
+            None,
+        )
+        .await?;
         Ok(())
     }
 

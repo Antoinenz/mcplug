@@ -26,16 +26,31 @@ pub async fn status(server: &Server, provider: &dyn ServerJarProvider) -> Result
     let jar = server.jar.as_ref().ok_or_else(|| Error::Msg("no server jar".into()))?;
     let mc = jar.mc_version.clone().ok_or_else(|| Error::Msg("unknown Minecraft version".into()))?;
     let path = server.jar_path().expect("jar path");
-    let hashes = tokio::task::spawn_blocking(move || JarHashes::of_file(&path)).await.map_err(|e| Error::Msg(e.to_string()))??;
+    let hashes = tokio::task::spawn_blocking(move || JarHashes::of_file(&path))
+        .await
+        .map_err(|e| Error::Msg(e.to_string()))??;
     let md5 = md5_of(&server.jar_path().expect("jar path"));
     let installed = identify_build(provider, &mc, &hashes.sha256, md5.as_deref()).await?;
     let latest_same_mc = provider.latest_build(&mc).await.ok();
     let newest_mc = provider.mc_versions().await.ok().and_then(|v| v.into_iter().next());
-    let java_major = match server.start_command.as_deref().map(StartCommand::parse).and_then(|c| c.java().map(str::to_string)) {
+    let java_major = match server
+        .start_command
+        .as_deref()
+        .map(StartCommand::parse)
+        .and_then(|c| c.java().map(str::to_string))
+    {
         Some(j) => crate::server::java::java_major(&j, Some(&server.root)).await,
         None => None,
     };
-    Ok(JarStatus { file: jar.file_name.clone(), mc, installed, sha256: hashes.sha256, latest_same_mc, newest_mc, java_major })
+    Ok(JarStatus {
+        file: jar.file_name.clone(),
+        mc,
+        installed,
+        sha256: hashes.sha256,
+        latest_same_mc,
+        newest_mc,
+        java_major,
+    })
 }
 
 fn md5_of(path: &Path) -> Option<String> {
@@ -55,7 +70,10 @@ pub struct PluginCompat {
 
 /// For an MC upgrade: which version of each managed plugin would run on `target`.
 pub async fn plugin_compat(lock: &LockFile, sources: &Sources, base_ctx: &CompatCtx, target: &crate::util::McVersion) -> Vec<PluginCompat> {
-    let ctx = CompatCtx { mc_version: target.clone(), ..base_ctx.clone() };
+    let ctx = CompatCtx {
+        mc_version: target.clone(),
+        ..base_ctx.clone()
+    };
     let mut out = Vec::new();
     for e in &lock.plugins {
         if !e.source.is_managed() {
@@ -85,7 +103,12 @@ pub async fn plugin_compat(lock: &LockFile, sources: &Sources, base_ctx: &Compat
                 best = Some((v, c));
             }
         }
-        out.push(PluginCompat { name: e.name.clone(), current, best: best.map(|(v, _)| v.version_number.clone()), compat: best.map(|(_, c)| c).unwrap_or(Compat::Incompatible) });
+        out.push(PluginCompat {
+            name: e.name.clone(),
+            current,
+            best: best.map(|(v, _)| v.version_number.clone()),
+            compat: best.map(|(_, c)| c).unwrap_or(Compat::Incompatible),
+        });
     }
     out
 }
@@ -103,24 +126,54 @@ pub async fn java_check(server: &Server, java_min: Option<u32>) -> Result<Option
             Ok(Some(format!(
                 "needs Java {min}, but `{java}` is Java {}. {}",
                 have.map(|h| h.to_string()).unwrap_or_else(|| "?".into()),
-                if alternatives.is_empty() { "Install a newer JDK and point the start command at it.".into() } else { format!("Installed JVMs: {}", alternatives.join(", ")) }
+                if alternatives.is_empty() {
+                    "Install a newer JDK and point the start command at it.".into()
+                } else {
+                    format!("Installed JVMs: {}", alternatives.join(", "))
+                }
             )))
         }
     }
 }
 
 /// Download `build`, verify, swap it in next to the old jar and update the start command.
-pub async fn install_build(server: &Server, control: &dyn crate::control::ServerControl, build: &BuildInfo, http: &reqwest::Client, progress: crate::transaction::ProgressFn) -> Result<String> {
+pub async fn install_build(
+    server: &Server,
+    control: &dyn crate::control::ServerControl,
+    build: &BuildInfo,
+    http: &reqwest::Client,
+    progress: crate::transaction::ProgressFn,
+) -> Result<String> {
     let plugins_dir = server.plugins_dir();
     let tx = crate::transaction::new_tx_id();
     let staging = crate::transaction::staging_dir(&plugins_dir, &tx);
     std::fs::create_dir_all(&staging)?;
     progress(crate::transaction::Progress::Step(format!("downloading {}", build.file_name)));
-    let file = crate::sources::VersionFile { name: build.file_name.clone(), url: build.url.clone(), size: None, sha512: None, sha256: build.sha256.clone(), sha1: None, primary: true };
+    let file = crate::sources::VersionFile {
+        name: build.file_name.clone(),
+        url: build.url.clone(),
+        size: None,
+        sha512: None,
+        sha256: build.sha256.clone(),
+        sha1: None,
+        primary: true,
+    };
     let dest = staging.join(&build.file_name);
     let name = build.file_name.clone();
     let p = progress.clone();
-    let hashes = crate::sources::download_file(http, &file, &dest, Box::new(move |done, total| p(crate::transaction::Progress::Download { name: name.clone(), done, total }))).await?;
+    let hashes = crate::sources::download_file(
+        http,
+        &file,
+        &dest,
+        Box::new(move |done, total| {
+            p(crate::transaction::Progress::Download {
+                name: name.clone(),
+                done,
+                total,
+            })
+        }),
+    )
+    .await?;
     if let Some(want) = &build.sha256 {
         if !want.eq_ignore_ascii_case(&hashes.sha256) {
             let _ = std::fs::remove_dir_all(&staging);
@@ -161,14 +214,23 @@ pub async fn install_build(server: &Server, control: &dyn crate::control::Server
             }
         }
     }
-    let _ = journal::append(&plugins_dir, &JournalEntry {
-        time: chrono::Utc::now(),
-        tx_id: tx.clone(),
-        action: "server-jar".into(),
-        outcome: "applied".into(),
-        items: vec![JournalItem { name: format!("{}", build.mc), from: server.jar.as_ref().and_then(|j| j.build_hint).map(|b| format!("build {b}")), to: format!("build {}", build.build), old_file: old_name, new_file: build.file_name.clone() }],
-        note: note.clone(),
-    });
+    let _ = journal::append(
+        &plugins_dir,
+        &JournalEntry {
+            time: chrono::Utc::now(),
+            tx_id: tx.clone(),
+            action: "server-jar".into(),
+            outcome: "applied".into(),
+            items: vec![JournalItem {
+                name: format!("{}", build.mc),
+                from: server.jar.as_ref().and_then(|j| j.build_hint).map(|b| format!("build {b}")),
+                to: format!("build {}", build.build),
+                old_file: old_name,
+                new_file: build.file_name.clone(),
+            }],
+            note: note.clone(),
+        },
+    );
     if let Some(n) = note {
         progress(crate::transaction::Progress::Step(n));
     }

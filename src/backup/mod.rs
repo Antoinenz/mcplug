@@ -19,7 +19,12 @@ impl Mcbackup {
             "off" | "" => None,
             "auto" => {
                 let candidates = ["/usr/local/bin/mcbackup", "/usr/bin/mcbackup"];
-                candidates.iter().map(PathBuf::from).find(|p| p.exists()).or_else(|| which("mcbackup")).map(|bin| Self { bin })
+                candidates
+                    .iter()
+                    .map(PathBuf::from)
+                    .find(|p| p.exists())
+                    .or_else(|| which("mcbackup"))
+                    .map(|bin| Self { bin })
             }
             path => Some(Self { bin: PathBuf::from(path) }),
         }
@@ -28,9 +33,15 @@ impl Mcbackup {
     async fn run(&self, args: &[&str], timeout: Duration) -> Result<String> {
         let mut cmd = tokio::process::Command::new(&self.bin);
         cmd.args(args);
-        let out = tokio::time::timeout(timeout, cmd.output()).await.map_err(|_| Error::Msg(format!("mcbackup {} timed out", args[0])))??;
+        let out = tokio::time::timeout(timeout, cmd.output())
+            .await
+            .map_err(|_| Error::Msg(format!("mcbackup {} timed out", args[0])))??;
         if !out.status.success() {
-            return Err(Error::Msg(format!("mcbackup {}: {}", args.join(" "), String::from_utf8_lossy(&out.stderr).trim())));
+            return Err(Error::Msg(format!(
+                "mcbackup {}: {}",
+                args.join(" "),
+                String::from_utf8_lossy(&out.stderr).trim()
+            )));
         }
         Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
     }
@@ -47,10 +58,18 @@ impl Mcbackup {
     /// Source names mcbackup knows, so we can warn when a server isn't covered.
     pub async fn sources(&self) -> Result<Vec<String>> {
         let out = self.run(&["discover"], Duration::from_secs(60)).await?;
-        Ok(out.lines().filter(|l| !l.starts_with(' ')).filter_map(|l| l.split_whitespace().next().map(str::to_string)).collect())
+        Ok(out
+            .lines()
+            .filter(|l| !l.starts_with(' '))
+            .filter_map(|l| l.split_whitespace().next().map(str::to_string))
+            .collect())
     }
 }
 
 fn which(name: &str) -> Option<PathBuf> {
-    std::env::var_os("PATH")?.to_str()?.split(':').map(|d| PathBuf::from(d).join(name)).find(|p| p.exists())
+    std::env::var_os("PATH")?
+        .to_str()?
+        .split(':')
+        .map(|d| PathBuf::from(d).join(name))
+        .find(|p| p.exists())
 }

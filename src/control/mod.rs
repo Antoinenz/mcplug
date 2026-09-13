@@ -82,10 +82,19 @@ pub async fn wait_for(c: &(impl ServerControl + ?Sized), want: ServerStatus, tim
 /// Pick the right control for a server.
 pub fn for_server(server: &Server, mcsm: Option<crate::server::mcsm::Mcsm>, secrets: &crate::config::Secrets) -> Box<dyn ServerControl> {
     if let (Some(uuid), Some(m)) = (server.mcsm_uuid(), mcsm) {
-        return Box::new(mcsm::McsmControl { mcsm: m, uuid: uuid.to_string(), port: server.ping_port });
+        return Box::new(mcsm::McsmControl {
+            mcsm: m,
+            uuid: uuid.to_string(),
+            port: server.ping_port,
+        });
     }
     match &server.control {
-        ControlConfig::Rcon { host, port, password_ref, restart_command } => Box::new(rcon::RconControl {
+        ControlConfig::Rcon {
+            host,
+            port,
+            password_ref,
+            restart_command,
+        } => Box::new(rcon::RconControl {
             host: host.clone(),
             port: *port,
             password: secrets.rcon.get(password_ref).cloned().unwrap_or_default(),
@@ -93,7 +102,11 @@ pub fn for_server(server: &Server, mcsm: Option<crate::server::mcsm::Mcsm>, secr
             ping_port: server.ping_port,
             cwd: server.root.clone(),
         }),
-        ControlConfig::Command { restart_command } => Box::new(command::CommandControl { restart_command: restart_command.clone(), ping_port: server.ping_port, cwd: server.root.clone() }),
+        ControlConfig::Command { restart_command } => Box::new(command::CommandControl {
+            restart_command: restart_command.clone(),
+            ping_port: server.ping_port,
+            cwd: server.root.clone(),
+        }),
         ControlConfig::None => Box::new(command::NoControl { ping_port: server.ping_port }),
     }
 }

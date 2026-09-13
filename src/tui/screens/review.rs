@@ -36,11 +36,23 @@ pub fn render(f: &mut Frame, state: &mut State, area: Rect) {
             ])
         })
         .collect();
-    let widths = [Constraint::Min(16), Constraint::Length(18), Constraint::Length(18), Constraint::Length(9), Constraint::Min(20), Constraint::Length(22)];
-    let table = Table::new(rows, widths).header(header).row_highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+    let widths = [
+        Constraint::Min(16),
+        Constraint::Length(18),
+        Constraint::Length(18),
+        Constraint::Length(9),
+        Constraint::Min(20),
+        Constraint::Length(22),
+    ];
+    let table = Table::new(rows, widths)
+        .header(header)
+        .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED));
     let mut ts = TableState::default().with_selected(Some(state.flow.plan_selected));
     f.render_stateful_widget(table, table_area, &mut ts);
-    let mut lines = vec![Line::from(Span::styled("Enter continue   v pick another version   - drop row   Esc cancel", super::dim()))];
+    let mut lines = vec![Line::from(Span::styled(
+        "Enter continue   v pick another version   - drop row   Esc cancel",
+        super::dim(),
+    ))];
     for n in &plan.notes {
         lines.push(Line::from(Span::styled(format!("· {n}"), super::dim())));
     }

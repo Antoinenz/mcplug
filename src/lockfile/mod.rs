@@ -90,11 +90,29 @@ pub enum CompatMode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum SourceRef {
-    Modrinth { project_id: String, version_id: String, version_number: String },
-    Hangar { slug: String, version_name: String, platform: String },
-    GitHub { owner: String, repo: String, asset_glob: String, tag: String, asset_name: String },
+    Modrinth {
+        project_id: String,
+        version_id: String,
+        version_number: String,
+    },
+    Hangar {
+        slug: String,
+        version_name: String,
+        platform: String,
+    },
+    GitHub {
+        owner: String,
+        repo: String,
+        asset_glob: String,
+        tag: String,
+        asset_name: String,
+    },
     #[serde(rename = "geysermc")]
-    GeyserMc { project: String, download: String, build: Option<u32> },
+    GeyserMc {
+        project: String,
+        download: String,
+        build: Option<u32>,
+    },
     /// Scan couldn't decide. The UI keeps offering candidates.
     Unidentified,
     /// User said "leave it alone". Stays quiet until the jar's hash changes.
@@ -124,7 +142,11 @@ impl LockFile {
     }
 
     pub fn new() -> Self {
-        Self { version: 1, server: LockServer::default(), plugins: Vec::new() }
+        Self {
+            version: 1,
+            server: LockServer::default(),
+            plugins: Vec::new(),
+        }
     }
 
     pub fn load(plugins_dir: &Path) -> Result<Option<Self>> {
@@ -193,7 +215,11 @@ mod tests {
             ignored_versions: vec![],
             compat: CompatMode::Inherit,
             installed_at: None,
-            source: SourceRef::Modrinth { project_id: "Vebnzrzj".into(), version_id: "abc".into(), version_number: "v5.5.71-bukkit".into() },
+            source: SourceRef::Modrinth {
+                project_id: "Vebnzrzj".into(),
+                version_id: "abc".into(),
+                version_number: "v5.5.71-bukkit".into(),
+            },
         });
         lock.plugins.push(PluginEntry {
             name: "LockIn".into(),

@@ -16,17 +16,43 @@ use crate::transaction::{TxOutcome, UpdatePlan};
 
 /// Messages from background jobs.
 pub enum Msg {
-    Status { id: String, status: String, players: Option<u32> },
-    ScanDone { id: String, result: Result<ScanOutcome> },
-    CheckDone { id: String, result: Result<CheckReport> },
-    PlanBuilt { id: String, result: Result<UpdatePlan> },
-    VersionsLoaded { result: Result<Vec<ResolvedVersion>> },
-    SearchDone { result: Result<Vec<Candidate>> },
-    CollectionsLoaded { result: Result<Vec<crate::sources::modrinth::Collection>> },
+    Status {
+        id: String,
+        status: String,
+        players: Option<u32>,
+    },
+    ScanDone {
+        id: String,
+        result: Result<ScanOutcome>,
+    },
+    CheckDone {
+        id: String,
+        result: Result<CheckReport>,
+    },
+    PlanBuilt {
+        id: String,
+        result: Result<UpdatePlan>,
+    },
+    VersionsLoaded {
+        result: Result<Vec<ResolvedVersion>>,
+    },
+    SearchDone {
+        result: Result<Vec<Candidate>>,
+    },
+    CollectionsLoaded {
+        result: Result<Vec<crate::sources::modrinth::Collection>>,
+    },
     ApplyProgress(String),
-    ApplyDone { id: String, result: Result<TxOutcome>, lock: LockFile },
-    RevertDone { id: String, result: Result<Vec<String>>, lock: LockFile },
-    Log(String),
+    ApplyDone {
+        id: String,
+        result: Result<TxOutcome>,
+        lock: LockFile,
+    },
+    RevertDone {
+        id: String,
+        result: Result<Vec<String>>,
+        lock: LockFile,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,11 +118,16 @@ pub struct ServerView {
 impl ServerView {
     pub fn new(server: Server) -> Self {
         let lock = LockFile::load(&server.plugins_dir()).ok().flatten();
-        Self { server, lock, check: None, undecided: Vec::new(), status: "…".into(), players: None, busy: None, last_error: None }
-    }
-
-    pub fn updates(&self) -> usize {
-        self.check.as_ref().map(|c| c.updates.len()).unwrap_or(0)
+        Self {
+            server,
+            lock,
+            check: None,
+            undecided: Vec::new(),
+            status: "…".into(),
+            players: None,
+            busy: None,
+            last_error: None,
+        }
     }
 }
 

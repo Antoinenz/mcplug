@@ -56,7 +56,10 @@ impl Source for GitHub {
         if segs.len() < 2 {
             return None;
         }
-        Some(ProjectLocator { source: SourceKind::GitHub, id: format!("{}/{}", segs[0], segs[1].trim_end_matches(".git")) })
+        Some(ProjectLocator {
+            source: SourceKind::GitHub,
+            id: format!("{}/{}", segs[0], segs[1].trim_end_matches(".git")),
+        })
     }
 
     async fn identify_by_hashes(&self, _hashes: &[JarHashes]) -> Result<HashMap<String, (ProjectRef, ResolvedVersion)>> {
@@ -67,7 +70,11 @@ impl Source for GitHub {
         // Accept "owner/repo" typed into the search box; general code search isn't useful here.
         if query.matches('/').count() == 1 && !query.contains(' ') {
             if let Ok(p) = self.project(query).await {
-                return Ok(vec![Candidate { project: p, confidence: Confidence::ExactName, version: None }]);
+                return Ok(vec![Candidate {
+                    project: p,
+                    confidence: Confidence::ExactName,
+                    version: None,
+                }]);
             }
         }
         Ok(vec![])
@@ -89,7 +96,10 @@ impl Source for GitHub {
     }
 
     async fn versions(&self, project_id: &str, _ctx: &CompatCtx) -> Result<Vec<ResolvedVersion>> {
-        let raw: Vec<GhRelease> = self.api.get_json(&format!("{API}/repos/{project_id}/releases"), &[("per_page", "20".into())]).await?;
+        let raw: Vec<GhRelease> = self
+            .api
+            .get_json(&format!("{API}/repos/{project_id}/releases"), &[("per_page", "20".into())])
+            .await?;
         let mut out: Vec<ResolvedVersion> = raw
             .into_iter()
             .filter(|r| !r.draft)
@@ -105,7 +115,15 @@ impl Source for GitHub {
                 files: r
                     .assets
                     .into_iter()
-                    .map(|a| VersionFile { name: a.name, url: a.browser_download_url, size: a.size, sha512: None, sha256: None, sha1: None, primary: false })
+                    .map(|a| VersionFile {
+                        name: a.name,
+                        url: a.browser_download_url,
+                        size: a.size,
+                        sha512: None,
+                        sha256: None,
+                        sha1: None,
+                        primary: false,
+                    })
                     .collect(),
                 dependencies: vec![],
                 changelog: r.body,
@@ -114,7 +132,7 @@ impl Source for GitHub {
         for v in &mut out {
             Self::filter_assets(v, "*.jar");
         }
-        out.sort_by(|a, b| b.published.cmp(&a.published));
+        out.sort_by_key(|v| std::cmp::Reverse(v.published));
         Ok(out)
     }
 }

@@ -96,7 +96,8 @@ impl Policy {
         let o = self.per_server.get(id).cloned().unwrap_or_default();
         EffectivePolicy {
             enabled: o.enabled.unwrap_or(true),
-            check_interval: humantime::parse_duration(o.check_interval.as_deref().unwrap_or(&self.check_interval)).unwrap_or(std::time::Duration::from_secs(6 * 3600)),
+            check_interval: humantime::parse_duration(o.check_interval.as_deref().unwrap_or(&self.check_interval))
+                .unwrap_or(std::time::Duration::from_secs(6 * 3600)),
             auto_apply: o.auto_apply.unwrap_or_else(|| self.auto_apply.clone()),
             restart: o.restart.unwrap_or_else(|| self.restart.clone()),
             restart_at: o.restart_at.unwrap_or_else(|| self.restart_at.clone()),
@@ -199,7 +200,12 @@ pub struct SourcesConfig {
 
 impl Default for SourcesConfig {
     fn default() -> Self {
-        Self { modrinth: true, hangar: true, github: true, geysermc: true }
+        Self {
+            modrinth: true,
+            hangar: true,
+            github: true,
+            geysermc: true,
+        }
     }
 }
 

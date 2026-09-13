@@ -29,7 +29,12 @@ impl JarHashes {
             h512.update(&buf[..n]);
             size += n as u64;
         }
-        Ok(Self { sha1: hex::encode(h1.finalize()), sha256: hex::encode(h256.finalize()), sha512: hex::encode(h512.finalize()), size })
+        Ok(Self {
+            sha1: hex::encode(h1.finalize()),
+            sha256: hex::encode(h256.finalize()),
+            sha512: hex::encode(h512.finalize()),
+            size,
+        })
     }
 
     pub fn of_bytes(bytes: &[u8]) -> Self {

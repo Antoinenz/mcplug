@@ -69,10 +69,22 @@ pub fn installed_label(e: &PluginEntry) -> String {
 
 fn entry_locator(e: &PluginEntry) -> Option<ProjectLocator> {
     Some(match &e.source {
-        SourceRef::Modrinth { project_id, .. } => ProjectLocator { source: SourceKind::Modrinth, id: project_id.clone() },
-        SourceRef::Hangar { slug, .. } => ProjectLocator { source: SourceKind::Hangar, id: slug.clone() },
-        SourceRef::GitHub { owner, repo, .. } => ProjectLocator { source: SourceKind::GitHub, id: format!("{owner}/{repo}") },
-        SourceRef::GeyserMc { project, .. } => ProjectLocator { source: SourceKind::GeyserMc, id: project.clone() },
+        SourceRef::Modrinth { project_id, .. } => ProjectLocator {
+            source: SourceKind::Modrinth,
+            id: project_id.clone(),
+        },
+        SourceRef::Hangar { slug, .. } => ProjectLocator {
+            source: SourceKind::Hangar,
+            id: slug.clone(),
+        },
+        SourceRef::GitHub { owner, repo, .. } => ProjectLocator {
+            source: SourceKind::GitHub,
+            id: format!("{owner}/{repo}"),
+        },
+        SourceRef::GeyserMc { project, .. } => ProjectLocator {
+            source: SourceKind::GeyserMc,
+            id: project.clone(),
+        },
         _ => return None,
     })
 }
@@ -83,9 +95,21 @@ fn installed_project_ids(lock: &LockFile) -> HashSet<(SourceKind, String)> {
 
 /// Turn requests into a concrete, verified-as-far-as-possible plan. Required Modrinth/Hangar
 /// dependencies that aren't installed are added automatically (marked `dependency_of`).
-pub async fn build_plan(server: &Server, lock: &LockFile, sources: &Sources, ctx: &CompatCtx, requests: Vec<PlanRequest>, allow_unverified: bool) -> Result<UpdatePlan> {
+pub async fn build_plan(
+    server: &Server,
+    lock: &LockFile,
+    sources: &Sources,
+    ctx: &CompatCtx,
+    requests: Vec<PlanRequest>,
+    allow_unverified: bool,
+) -> Result<UpdatePlan> {
     let _ = server;
-    let mut plan = UpdatePlan { tx_id: super::new_tx_id(), items: Vec::new(), unresolved_deps: Vec::new(), notes: Vec::new() };
+    let mut plan = UpdatePlan {
+        tx_id: super::new_tx_id(),
+        items: Vec::new(),
+        unresolved_deps: Vec::new(),
+        notes: Vec::new(),
+    };
     let mut installed = installed_project_ids(lock);
     let mut queued: HashSet<(SourceKind, String)> = HashSet::new();
     let mut queue: Vec<(PlanRequest, Option<String>)> = requests.into_iter().map(|r| (r, None)).collect();
@@ -103,7 +127,9 @@ pub async fn build_plan(server: &Server, lock: &LockFile, sources: &Sources, ctx
             }
             PlanRequest::Install { locator, version_id } => (locator.clone(), None, version_id.clone(), String::new()),
         };
-        let src = sources.get(locator.source).ok_or_else(|| Error::Msg(format!("source {} is disabled", locator.source)))?;
+        let src = sources
+            .get(locator.source)
+            .ok_or_else(|| Error::Msg(format!("source {} is disabled", locator.source)))?;
         let project = src.project(&locator.id).await?;
         let name = if name.is_empty() { project.name.clone() } else { name };
         if from.is_none() && installed.contains(&(locator.source, locator.id.clone())) {
@@ -116,21 +142,36 @@ pub async fn build_plan(server: &Server, lock: &LockFile, sources: &Sources, ctx
         };
         let versions = src.versions(&locator.id, &entry_ctx).await?;
         let chosen = match &want_version {
-            Some(id) => versions.iter().find(|v| &v.version_id == id).cloned().ok_or_else(|| Error::Msg(format!("{name}: version {id} not found")))?,
+            Some(id) => versions
+                .iter()
+                .find(|v| &v.version_id == id)
+                .cloned()
+                .ok_or_else(|| Error::Msg(format!("{name}: version {id} not found")))?,
             None => {
                 let tmp_entry = from.clone().unwrap_or_else(|| fresh_entry(&name));
-                pick(&versions, &tmp_entry, &entry_ctx).map(|(v, _)| v).ok_or_else(|| Error::Msg(format!("{name}: no version compatible with {}", ctx.mc_version)))?
+                pick(&versions, &tmp_entry, &entry_ctx)
+                    .map(|(v, _)| v)
+                    .ok_or_else(|| Error::Msg(format!("{name}: no version compatible with {}", ctx.mc_version)))?
             }
         };
-        let mut file = chosen.primary_file().cloned().ok_or_else(|| Error::Msg(format!("{name}: version {} has no downloadable file", chosen.version_number)))?;
+        let mut file = chosen
+            .primary_file()
+            .cloned()
+            .ok_or_else(|| Error::Msg(format!("{name}: version {} has no downloadable file", chosen.version_number)))?;
         if let Some(SourceRef::GitHub { asset_glob, .. }) = from.as_ref().map(|e| &e.source) {
             let mut v = chosen.clone();
             crate::sources::github::GitHub::filter_assets(&mut v, asset_glob);
-            file = v.primary_file().cloned().ok_or_else(|| Error::Msg(format!("{name}: no asset matches {asset_glob}")))?;
+            file = v
+                .primary_file()
+                .cloned()
+                .ok_or_else(|| Error::Msg(format!("{name}: no asset matches {asset_glob}")))?;
         }
         let unverified = file.sha512.is_none() && file.sha256.is_none() && file.sha1.is_none();
         if unverified && !allow_unverified {
-            return Err(Error::Msg(format!("{name}: {} publishes no checksum; pass --allow-unverified to accept", locator.source)));
+            return Err(Error::Msg(format!(
+                "{name}: {} publishes no checksum; pass --allow-unverified to accept",
+                locator.source
+            )));
         }
         if let Some(e) = &from {
             if e.hashes.sha512.as_str() == file.sha512.as_deref().unwrap_or("") || Some(e.hashes.sha256.as_str()) == file.sha256.as_deref() {
@@ -149,10 +190,27 @@ pub async fn build_plan(server: &Server, lock: &LockFile, sources: &Sources, ctx
                 continue;
             }
             queued.insert(key);
-            queue.push((PlanRequest::Install { locator: ProjectLocator { source: locator.source, id: pid.clone() }, version_id: None }, Some(name.clone())));
+            queue.push((
+                PlanRequest::Install {
+                    locator: ProjectLocator {
+                        source: locator.source,
+                        id: pid.clone(),
+                    },
+                    version_id: None,
+                },
+                Some(name.clone()),
+            ));
         }
         installed.insert((locator.source, locator.id.clone()));
-        plan.items.push(PlanItem { name, project, from, to: chosen, file, dependency_of: dep_of, unverified });
+        plan.items.push(PlanItem {
+            name,
+            project,
+            from,
+            to: chosen,
+            file,
+            dependency_of: dep_of,
+            unverified,
+        });
     }
     // dependencies first, so a missing dep is caught before its dependent is swapped in
     plan.items.sort_by_key(|i| i.dependency_of.is_none());

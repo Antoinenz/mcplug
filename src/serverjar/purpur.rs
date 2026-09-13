@@ -75,7 +75,7 @@ impl ServerJarProvider for Purpur {
                 md5: b.md5,
                 java_min: None,
                 channel: "default".into(),
-                time: b.timestamp.and_then(|t| chrono::DateTime::from_timestamp_millis(t)),
+                time: b.timestamp.and_then(chrono::DateTime::from_timestamp_millis),
             });
         }
         Ok(out)

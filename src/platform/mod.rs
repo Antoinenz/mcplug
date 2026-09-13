@@ -46,5 +46,5 @@ pub enum DescriptorCompat {
 }
 
 pub fn for_kind(kind: PlatformKind) -> Option<bukkit::Bukkit> {
-    kind.is_bukkit().then(|| bukkit::Bukkit { kind })
+    kind.is_bukkit().then_some(bukkit::Bukkit { kind })
 }

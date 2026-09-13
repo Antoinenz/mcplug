@@ -163,7 +163,9 @@ pub async fn check(sources: &Sources, lock: &LockFile, base_ctx: &CompatCtx, ser
     }
 
     for entry in needs_list {
-        let (Some(kind), Some(pid)) = (source_kind(entry), project_id(entry)) else { continue };
+        let (Some(kind), Some(pid)) = (source_kind(entry), project_id(entry)) else {
+            continue;
+        };
         let Some(src) = sources.get(kind) else {
             report.errors.push(format!("{}: source {kind} is disabled", entry.name));
             continue;
@@ -180,7 +182,7 @@ pub async fn check(sources: &Sources, lock: &LockFile, base_ctx: &CompatCtx, ser
             Err(e) => report.errors.push(format!("{}: {e}", entry.name)),
         }
     }
-    report.updates.sort_by(|a, b| a.name.to_ascii_lowercase().cmp(&b.name.to_ascii_lowercase()));
+    report.updates.sort_by_key(|a| a.name.to_ascii_lowercase());
     report
 }
 

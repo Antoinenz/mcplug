@@ -45,7 +45,18 @@ pub fn status(ctx: &Ctx) -> Result<()> {
     println!("config dir: {}", ctx.loaded.dir.display());
     println!("modrinth token: {}", yn(&s.modrinth_token));
     println!("github token:   {}", yn(&s.github_token));
-    println!("mcsm api key:   {}", if ctx.loaded.mcsm_api_key().is_some() { if s.mcsm_api_key.is_some() { "set" } else { "set (from mcbackup env)" } } else { "-" });
+    println!(
+        "mcsm api key:   {}",
+        if ctx.loaded.mcsm_api_key().is_some() {
+            if s.mcsm_api_key.is_some() {
+                "set"
+            } else {
+                "set (from mcbackup env)"
+            }
+        } else {
+            "-"
+        }
+    );
     for k in s.rcon.keys() {
         println!("rcon/{k}:        set");
     }

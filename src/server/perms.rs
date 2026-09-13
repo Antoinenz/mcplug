@@ -23,7 +23,9 @@ impl Access {
                 } else {
                     ""
                 };
-                Access::ReadOnly { reason: format!("{} not writable{hint}", plugins_dir.display()) }
+                Access::ReadOnly {
+                    reason: format!("{} not writable{hint}", plugins_dir.display()),
+                }
             }
             Err(e) => Access::ReadOnly { reason: e.to_string() },
         }

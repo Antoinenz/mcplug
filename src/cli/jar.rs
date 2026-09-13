@@ -19,7 +19,8 @@ pub struct JarArgs {
 
 pub async fn run(ctx: &Ctx, a: &JarArgs) -> Result<()> {
     let server = ctx.server(&a.server)?;
-    let provider = serverjar::for_platform(ctx.http.clone(), server.platform).ok_or_else(|| Error::Msg(format!("{}: no build provider for {}", server.name, server.platform)))?;
+    let provider = serverjar::for_platform(ctx.http.clone(), server.platform)
+        .ok_or_else(|| Error::Msg(format!("{}: no build provider for {}", server.name, server.platform)))?;
     let st = jarops::status(&server, provider.as_ref()).await?;
     println!(
         "{}: {} {} — {} {}",
@@ -28,7 +29,11 @@ pub async fn run(ctx: &Ctx, a: &JarArgs) -> Result<()> {
         st.mc,
         st.file,
         match &st.installed {
-            Some(b) => format!("(build {}{})", b.build, b.time.map(|t| format!(", {}", t.format("%Y-%m-%d"))).unwrap_or_default()),
+            Some(b) => format!(
+                "(build {}{})",
+                b.build,
+                b.time.map(|t| format!(", {}", t.format("%Y-%m-%d"))).unwrap_or_default()
+            ),
             None => "(build not recognised — not a published build of this version?)".into(),
         }
     );
@@ -37,12 +42,20 @@ pub async fn run(ctx: &Ctx, a: &JarArgs) -> Result<()> {
         if cur == Some(l.build) {
             println!("  build: up to date");
         } else {
-            println!("  build: {} available{} — `mcplug jar {} --update`", l.build, l.time.map(|t| format!(" ({})", t.format("%Y-%m-%d"))).unwrap_or_default(), server.id);
+            println!(
+                "  build: {} available{} — `mcplug jar {} --update`",
+                l.build,
+                l.time.map(|t| format!(" ({})", t.format("%Y-%m-%d"))).unwrap_or_default(),
+                server.id
+            );
         }
     }
     if let Some(n) = &st.newest_mc {
         if n > &st.mc {
-            println!("  minecraft: {n} available — `mcplug jar {} --mc {n} --check-only` to see plugin compatibility", server.id);
+            println!(
+                "  minecraft: {n} available — `mcplug jar {} --mc {n} --check-only` to see plugin compatibility",
+                server.id
+            );
         }
     }
     println!("  java: {}", st.java_major.map(|j| j.to_string()).unwrap_or_else(|| "?".into()));

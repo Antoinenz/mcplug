@@ -52,8 +52,7 @@ impl Secrets {
         let text = std::fs::read_to_string(env_file?).ok()?;
         text.lines().find_map(|l| {
             let (k, v) = l.split_once('=')?;
-            (k.trim() == "MCSM_APIKEY" && !v.trim().is_empty())
-                .then(|| v.trim().trim_matches('"').to_string())
+            (k.trim() == "MCSM_APIKEY" && !v.trim().is_empty()).then(|| v.trim().trim_matches('"').to_string())
         })
     }
 }
@@ -63,7 +62,10 @@ fn check_private(path: &Path) -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
     let mode = std::fs::metadata(path)?.permissions().mode() & 0o777;
     if mode & 0o077 != 0 {
-        return Err(Error::InsecureSecrets { path: path.to_path_buf(), mode });
+        return Err(Error::InsecureSecrets {
+            path: path.to_path_buf(),
+            mode,
+        });
     }
     Ok(())
 }

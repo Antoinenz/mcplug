@@ -21,7 +21,9 @@ pub struct Modrinth {
 
 impl Modrinth {
     pub fn new(http: reqwest::Client, token: Option<String>) -> Self {
-        Self { api: Api::new(http, 200, token.filter(|t| !t.is_empty())) }
+        Self {
+            api: Api::new(http, 200, token.filter(|t| !t.is_empty())),
+        }
     }
 
     fn loaders_facet(ctx: &CompatCtx) -> String {
@@ -48,7 +50,15 @@ impl Modrinth {
     pub async fn my_collections(&self) -> Result<Vec<Collection>> {
         let me: MrUser = self.api.get_json(&format!("{V3}/user"), &[]).await?;
         let cols: Vec<MrCollection> = self.api.get_json(&format!("{V3}/user/{}/collections", me.id), &[]).await?;
-        Ok(cols.into_iter().map(|c| Collection { id: c.id, name: c.name, description: c.description, project_ids: c.projects }).collect())
+        Ok(cols
+            .into_iter()
+            .map(|c| Collection {
+                id: c.id,
+                name: c.name,
+                description: c.description,
+                project_ids: c.projects,
+            })
+            .collect())
     }
 
     pub async fn projects(&self, ids: &[String]) -> Result<Vec<ProjectRef>> {
@@ -92,7 +102,10 @@ impl Source for Modrinth {
         if !matches!(kind, "plugin" | "mod" | "project" | "datapack") {
             return None;
         }
-        Some(ProjectLocator { source: SourceKind::Modrinth, id: segs.next()?.to_string() })
+        Some(ProjectLocator {
+            source: SourceKind::Modrinth,
+            id: segs.next()?.to_string(),
+        })
     }
 
     async fn identify_by_hashes(&self, hashes: &[JarHashes]) -> Result<HashMap<String, (ProjectRef, ResolvedVersion)>> {
@@ -102,7 +115,12 @@ impl Source for Modrinth {
         let sha512s: Vec<&str> = hashes.iter().map(|h| h.sha512.as_str()).collect();
         let body = serde_json::json!({ "hashes": sha512s, "algorithm": "sha512" });
         let raw: HashMap<String, MrVersion> = self.api.post_json(&format!("{V2}/version_files"), &body).await?;
-        let ids: Vec<String> = raw.values().map(|v| v.project_id.clone()).collect::<std::collections::BTreeSet<_>>().into_iter().collect();
+        let ids: Vec<String> = raw
+            .values()
+            .map(|v| v.project_id.clone())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect();
         let projects: HashMap<String, ProjectRef> = self.projects(&ids).await?.into_iter().map(|p| (p.id.clone(), p)).collect();
         let mut out = HashMap::new();
         for (hash, v) in raw {
@@ -116,7 +134,10 @@ impl Source for Modrinth {
     async fn search(&self, query: &str, ctx: &CompatCtx, _hashes: Option<&JarHashes>) -> Result<Vec<Candidate>> {
         let raw: MrSearch = self
             .api
-            .get_json(&format!("{V2}/search"), &[("query", query.to_string()), ("facets", Self::loaders_facet(ctx)), ("limit", "12".into())])
+            .get_json(
+                &format!("{V2}/search"),
+                &[("query", query.to_string()), ("facets", Self::loaders_facet(ctx)), ("limit", "12".into())],
+            )
             .await?;
         let q = query.to_ascii_lowercase();
         Ok(raw
@@ -130,7 +151,11 @@ impl Source for Modrinth {
                 } else {
                     Confidence::Weak
                 };
-                Candidate { project: h.into(), confidence, version: None }
+                Candidate {
+                    project: h.into(),
+                    confidence,
+                    version: None,
+                }
             })
             .collect())
     }
@@ -142,9 +167,12 @@ impl Source for Modrinth {
 
     async fn versions(&self, project_id: &str, ctx: &CompatCtx) -> Result<Vec<ResolvedVersion>> {
         let loaders = serde_json::to_string(&ctx.loaders)?;
-        let raw: Vec<MrVersion> = self.api.get_json(&format!("{V2}/project/{project_id}/version"), &[("loaders", loaders)]).await?;
+        let raw: Vec<MrVersion> = self
+            .api
+            .get_json(&format!("{V2}/project/{project_id}/version"), &[("loaders", loaders)])
+            .await?;
         let mut v: Vec<ResolvedVersion> = raw.into_iter().map(Into::into).collect();
-        v.sort_by(|a, b| b.published.cmp(&a.published));
+        v.sort_by_key(|v| std::cmp::Reverse(v.published));
         Ok(v)
     }
 }

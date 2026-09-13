@@ -59,11 +59,17 @@ impl Ctx {
             return Ok(s.clone());
         }
         let q = query.to_ascii_lowercase();
-        let m: Vec<&Server> = servers.iter().filter(|s| s.id.starts_with(&q) || s.name.to_ascii_lowercase().starts_with(&q)).collect();
+        let m: Vec<&Server> = servers
+            .iter()
+            .filter(|s| s.id.starts_with(&q) || s.name.to_ascii_lowercase().starts_with(&q))
+            .collect();
         match m.len() {
             1 => Ok(m[0].clone()),
             0 => Err(Error::Msg(format!("no server matches {query:?} (see `mcplug servers`)"))),
-            _ => Err(Error::Msg(format!("{query:?} is ambiguous: {}", m.iter().map(|s| s.id.as_str()).collect::<Vec<_>>().join(", ")))),
+            _ => Err(Error::Msg(format!(
+                "{query:?} is ambiguous: {}",
+                m.iter().map(|s| s.id.as_str()).collect::<Vec<_>>().join(", ")
+            ))),
         }
     }
 }

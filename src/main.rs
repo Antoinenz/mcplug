@@ -101,14 +101,21 @@ struct Flow {
 
 impl From<Flow> for mcplug::cli::update::FlowArgs {
     fn from(f: Flow) -> Self {
-        Self { restart: f.restart, countdown: f.countdown, no_backup: f.no_backup }
+        Self {
+            restart: f.restart,
+            countdown: f.countdown,
+            no_backup: f.no_backup,
+        }
     }
 }
 
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
-    tracing_subscriber::fmt().with_env_filter(tracing_subscriber::EnvFilter::from_env("MCPLUG_LOG")).with_writer(std::io::stderr).init();
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_env("MCPLUG_LOG"))
+        .with_writer(std::io::stderr)
+        .init();
     if let Err(e) = run(cli).await {
         eprintln!("error: {e}");
         std::process::exit(1);
@@ -121,15 +128,73 @@ async fn run(cli: Cli) -> mcplug::Result<()> {
     let ctx = mcplug::cli::Ctx { loaded, http, json: cli.json };
     match cli.cmd.unwrap_or(Cmd::Tui) {
         Cmd::Tui => mcplug::tui::run(ctx).await,
-        Cmd::Update { server, plugins, version, allow_unverified, yes, dry_run, flow } => {
-            mcplug::cli::update::update(&ctx, &mcplug::cli::update::UpdateArgs { server, plugins, version, allow_unverified, yes, dry_run, flow: flow.into() }).await
+        Cmd::Update {
+            server,
+            plugins,
+            version,
+            allow_unverified,
+            yes,
+            dry_run,
+            flow,
+        } => {
+            mcplug::cli::update::update(
+                &ctx,
+                &mcplug::cli::update::UpdateArgs {
+                    server,
+                    plugins,
+                    version,
+                    allow_unverified,
+                    yes,
+                    dry_run,
+                    flow: flow.into(),
+                },
+            )
+            .await
         }
-        Cmd::Install { server, target, version, allow_unverified, yes, flow } => {
-            mcplug::cli::update::install(&ctx, &mcplug::cli::update::InstallArgs { server, target, version, allow_unverified, yes, flow: flow.into() }).await
+        Cmd::Install {
+            server,
+            target,
+            version,
+            allow_unverified,
+            yes,
+            flow,
+        } => {
+            mcplug::cli::update::install(
+                &ctx,
+                &mcplug::cli::update::InstallArgs {
+                    server,
+                    target,
+                    version,
+                    allow_unverified,
+                    yes,
+                    flow: flow.into(),
+                },
+            )
+            .await
         }
         Cmd::Revert { server, tx } => mcplug::cli::update::revert(&ctx, &server, tx.as_deref()).await,
         Cmd::History { server } => mcplug::cli::update::history(&ctx, &server).await,
-        Cmd::Jar { server, update, mc, check_only, yes, flow } => mcplug::cli::jar::run(&ctx, &mcplug::cli::jar::JarArgs { server, update, mc, check_only, yes, flow: flow.into() }).await,
+        Cmd::Jar {
+            server,
+            update,
+            mc,
+            check_only,
+            yes,
+            flow,
+        } => {
+            mcplug::cli::jar::run(
+                &ctx,
+                &mcplug::cli::jar::JarArgs {
+                    server,
+                    update,
+                    mc,
+                    check_only,
+                    yes,
+                    flow: flow.into(),
+                },
+            )
+            .await
+        }
         Cmd::Daemon => mcplug::daemon::run(ctx).await,
         Cmd::Auth { what: None, .. } => mcplug::cli::auth::status(&ctx),
         Cmd::Auth { what: Some(w), value } => mcplug::cli::auth::set(&ctx, &w, value.as_deref()).await,

@@ -76,7 +76,12 @@ pub async fn download_file(http: &reqwest::Client, file: &VersionFile, dest: &Pa
         progress(done, total);
     }
     out.flush().await?;
-    Ok(JarHashes { sha1: hex::encode(h1.finalize()), sha256: hex::encode(h256.finalize()), sha512: hex::encode(h512.finalize()), size: done })
+    Ok(JarHashes {
+        sha1: hex::encode(h1.finalize()),
+        sha256: hex::encode(h256.finalize()),
+        sha512: hex::encode(h512.finalize()),
+        size: done,
+    })
 }
 
 /// The enabled sources, in identification priority order.

@@ -19,7 +19,12 @@ pub struct Api {
 
 impl Api {
     pub fn new(http: reqwest::Client, per_minute: u32, auth: Option<String>) -> Self {
-        Self { http, min_gap: Duration::from_millis(60_000 / per_minute.max(1) as u64), last: Arc::new(Mutex::new(None)), auth }
+        Self {
+            http,
+            min_gap: Duration::from_millis(60_000 / per_minute.max(1) as u64),
+            last: Arc::new(Mutex::new(None)),
+            auth,
+        }
     }
 
     async fn pace(&self) {
@@ -46,7 +51,12 @@ impl Api {
             let resp = self.apply_auth(self.http.get(url).query(query)).send().await?;
             match resp.status().as_u16() {
                 429 => {
-                    let wait = resp.headers().get("retry-after").and_then(|v| v.to_str().ok()).and_then(|s| s.parse::<u64>().ok()).unwrap_or(5);
+                    let wait = resp
+                        .headers()
+                        .get("retry-after")
+                        .and_then(|v| v.to_str().ok())
+                        .and_then(|s| s.parse::<u64>().ok())
+                        .unwrap_or(5);
                     tracing::warn!(url, wait, "rate limited");
                     tokio::time::sleep(Duration::from_secs(wait)).await;
                     continue;
@@ -69,7 +79,12 @@ impl Api {
             let resp = self.apply_auth(self.http.post(url).json(body)).send().await?;
             match resp.status().as_u16() {
                 429 => {
-                    let wait = resp.headers().get("retry-after").and_then(|v| v.to_str().ok()).and_then(|s| s.parse::<u64>().ok()).unwrap_or(5);
+                    let wait = resp
+                        .headers()
+                        .get("retry-after")
+                        .and_then(|v| v.to_str().ok())
+                        .and_then(|s| s.parse::<u64>().ok())
+                        .unwrap_or(5);
                     tokio::time::sleep(Duration::from_secs(wait)).await;
                     continue;
                 }

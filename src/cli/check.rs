@@ -40,11 +40,7 @@ pub async fn run(ctx: &Ctx, server: Option<&str>) -> Result<bool> {
             report.unmanaged.len()
         );
         for u in &report.updates {
-            let flags = format!(
-                "{}{}",
-                if u.untested { " untested" } else { "" },
-                if u.unverified { " unverified" } else { "" }
-            );
+            let flags = format!("{}{}", if u.untested { " untested" } else { "" }, if u.unverified { " unverified" } else { "" });
             println!(
                 "  ↑ {:<22} {:<24} → {:<24} {:<9} {}{}",
                 u.name,

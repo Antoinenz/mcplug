@@ -18,7 +18,13 @@ pub async fn run(ctx: &Ctx, args: &ScanArgs) -> Result<()> {
         eprintln!("warning: {e}");
     }
     if !out.saved {
-        eprintln!("note: lock not written — {}", match &server.access { crate::server::Access::ReadOnly { reason } => reason.clone(), _ => "plugin dir missing".into() });
+        eprintln!(
+            "note: lock not written — {}",
+            match &server.access {
+                crate::server::Access::ReadOnly { reason } => reason.clone(),
+                _ => "plugin dir missing".into(),
+            }
+        );
     }
     if ctx.json {
         println!("{}", serde_json::to_string_pretty(&out.lock)?);
@@ -26,7 +32,17 @@ pub async fn run(ctx: &Ctx, args: &ScanArgs) -> Result<()> {
     }
     let (scan, report, lock) = (&out.scan, &out.report, &out.lock);
     let mc = lock.server.mc_version.as_ref().map(|v| v.to_string()).unwrap_or_default();
-    println!("{} ({} {}) — {} plugins, {} unchanged, {} identified, {} need a decision, {} skipped", server.name, server.platform, mc, lock.plugins.len(), report.unchanged.len(), report.identified.len(), report.undecided.len(), report.skipped.len());
+    println!(
+        "{} ({} {}) — {} plugins, {} unchanged, {} identified, {} need a decision, {} skipped",
+        server.name,
+        server.platform,
+        mc,
+        lock.plugins.len(),
+        report.unchanged.len(),
+        report.identified.len(),
+        report.undecided.len(),
+        report.skipped.len()
+    );
     if !scan.duplicates.is_empty() {
         println!("  ! duplicate plugins (two jars with the same name): {}", scan.duplicates.join(", "));
     }
@@ -34,13 +50,25 @@ pub async fn run(ctx: &Ctx, args: &ScanArgs) -> Result<()> {
         println!("  ! plugins/update/ already holds: {}", scan.staged_updates.join(", "));
     }
     for id in &report.identified {
-        println!("  + {:<24} {:<9} {:<28} {}", id.jar.descriptor.as_ref().map(|d| d.name.as_str()).unwrap_or("?"), id.project.source, id.version.version_number, id.project.page_url);
+        println!(
+            "  + {:<24} {:<9} {:<28} {}",
+            id.jar.descriptor.as_ref().map(|d| d.name.as_str()).unwrap_or("?"),
+            id.project.source,
+            id.version.version_number,
+            id.project.page_url
+        );
     }
     for u in &report.undecided {
         let name = u.jar.descriptor.as_ref().map(|d| d.name.as_str()).unwrap_or("?");
         println!("  ? {:<24} {}", name, u.jar.file);
         for c in u.candidates.iter().take(4) {
-            println!("      {:<14} {:<9} {:<30} {}", confidence_str(c.confidence), c.project.source, c.project.name, c.project.page_url);
+            println!(
+                "      {:<14} {:<9} {:<30} {}",
+                confidence_str(c.confidence),
+                c.project.source,
+                c.project.name,
+                c.project.page_url
+            );
         }
     }
     for j in &report.skipped {

@@ -86,10 +86,22 @@ impl App {
             self.jobs.spawn(async move {
                 match m.status(&uuid).await {
                     Ok(st) => {
-                        let players = if st == InstanceStatus::Running { port.and_then(|p| crate::control::ping::player_count_sync(p)) } else { None };
-                        Msg::Status { id, status: format!("{st:?}").to_lowercase(), players }
+                        let players = if st == InstanceStatus::Running {
+                            port.and_then(crate::control::ping::player_count_sync)
+                        } else {
+                            None
+                        };
+                        Msg::Status {
+                            id,
+                            status: format!("{st:?}").to_lowercase(),
+                            players,
+                        }
                     }
-                    Err(e) => Msg::Status { id, status: format!("api error: {e}"), players: None },
+                    Err(e) => Msg::Status {
+                        id,
+                        status: format!("api error: {e}"),
+                        players: None,
+                    },
                 }
             });
         }
@@ -169,13 +181,14 @@ impl App {
                 let prefix = line.split_once(": ").map(|(p, _)| format!("{p}: "));
                 let log = &mut self.state.flow.apply_log;
                 match (prefix, log.last()) {
-                    (Some(p), Some(last)) if last.starts_with(&p) && (line.ends_with('%') || line.ends_with(" KB")) => *log.last_mut().expect("non-empty") = line,
+                    (Some(p), Some(last)) if last.starts_with(&p) && (line.ends_with('%') || line.ends_with(" KB")) => {
+                        *log.last_mut().expect("non-empty") = line
+                    }
                     _ => log.push(line),
                 }
             }
             Msg::ApplyDone { id, result, lock } => self.on_apply_done(id, result, lock),
             Msg::RevertDone { id, result, lock } => self.on_revert_done(id, result, lock),
-            Msg::Log(s) => self.state.log(s),
         }
     }
 
@@ -298,12 +311,21 @@ impl App {
     }
 
     pub(super) fn selected_plugin_name(&self) -> Option<String> {
-        self.state.current()?.lock.as_ref()?.plugins.get(self.state.plugin_selected).map(|p| p.name.clone())
+        self.state
+            .current()?
+            .lock
+            .as_ref()?
+            .plugins
+            .get(self.state.plugin_selected)
+            .map(|p| p.name.clone())
     }
 
     fn open_identify(&mut self) {
         let Some(name) = self.selected_plugin_name() else { return };
-        let has = self.state.current().is_some_and(|v| v.undecided.iter().any(|u| u.jar.descriptor.as_ref().is_some_and(|d| d.name == name)));
+        let has = self
+            .state
+            .current()
+            .is_some_and(|v| v.undecided.iter().any(|u| u.jar.descriptor.as_ref().is_some_and(|d| d.name == name)));
         if !has {
             self.state.toast(format!("{name}: no candidates — run a scan (s) to search again"));
             return;
@@ -316,7 +338,9 @@ impl App {
         let Some(name) = self.selected_plugin_name() else { return };
         let sel = self.state.candidate_selected;
         let Some(v) = self.state.current_mut() else { return };
-        let Some(u) = v.undecided.iter().find(|u| u.jar.descriptor.as_ref().is_some_and(|d| d.name == name)) else { return };
+        let Some(u) = v.undecided.iter().find(|u| u.jar.descriptor.as_ref().is_some_and(|d| d.name == name)) else {
+            return;
+        };
         let Some(c) = u.candidates.get(sel) else { return };
         let version = c.version.clone().unwrap_or_else(|| identify_placeholder(&c.project));
         let source = identify::source_ref(&c.project, &version);
@@ -335,7 +359,11 @@ impl App {
         let Some(v) = self.state.current_mut() else { return };
         let Some(lock) = v.lock.as_mut() else { return };
         let Some(e) = lock.get_mut(&name) else { return };
-        let new = if matches!(e.source, SourceRef::Unmanaged) { SourceRef::Unidentified } else { SourceRef::Unmanaged };
+        let new = if matches!(e.source, SourceRef::Unmanaged) {
+            SourceRef::Unidentified
+        } else {
+            SourceRef::Unmanaged
+        };
         let label = if matches!(new, SourceRef::Unmanaged) { "unmanaged" } else { "unidentified" };
         let msg = match ops::set_source(&v.server, lock, &name, new) {
             Ok(()) => format!("{name}: now {label}"),
@@ -361,7 +389,12 @@ impl App {
     fn ignore_latest(&mut self) {
         let Some(name) = self.selected_plugin_name() else { return };
         let Some(v) = self.state.current_mut() else { return };
-        let Some(latest) = v.check.as_ref().and_then(|c| c.updates.iter().find(|u| u.name == name)).map(|u| u.latest.clone()) else {
+        let Some(latest) = v
+            .check
+            .as_ref()
+            .and_then(|c| c.updates.iter().find(|u| u.name == name))
+            .map(|u| u.latest.clone())
+        else {
             self.state.toast(format!("{name}: no pending update to ignore"));
             return;
         };

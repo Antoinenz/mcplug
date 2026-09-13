@@ -11,7 +11,13 @@ pub fn render(f: &mut Frame, state: &mut State, area: Rect) {
     let title = match &state.flow.version_target {
         Some(VersionTarget::Plugin(n)) => format!("versions of {n}"),
         Some(VersionTarget::Install(_, n)) => format!("install {n} — pick a version"),
-        Some(VersionTarget::PlanItem(i)) => state.flow.plan.as_ref().and_then(|p| p.items.get(*i)).map(|it| format!("versions of {}", it.name)).unwrap_or_default(),
+        Some(VersionTarget::PlanItem(i)) => state
+            .flow
+            .plan
+            .as_ref()
+            .and_then(|p| p.items.get(*i))
+            .map(|it| format!("versions of {}", it.name))
+            .unwrap_or_default(),
         None => "versions".into(),
     };
     let inner = super::popup(f, area, 90, 24, &title);
@@ -43,11 +49,29 @@ pub fn render(f: &mut Frame, state: &mut State, area: Rect) {
             ])
         })
         .collect();
-    let widths = [Constraint::Length(26), Constraint::Length(9), Constraint::Length(12), Constraint::Length(13), Constraint::Min(20)];
-    let table = Table::new(rows, widths).header(header).row_highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+    let widths = [
+        Constraint::Length(26),
+        Constraint::Length(9),
+        Constraint::Length(12),
+        Constraint::Length(13),
+        Constraint::Min(20),
+    ];
+    let table = Table::new(rows, widths)
+        .header(header)
+        .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED));
     let mut ts = TableState::default().with_selected(Some(state.flow.version_selected));
     f.render_stateful_widget(table, table_area, &mut ts);
-    let changelog = state.flow.versions.get(state.flow.version_selected).and_then(|v| v.changelog.clone()).unwrap_or_default();
+    let changelog = state
+        .flow
+        .versions
+        .get(state.flow.version_selected)
+        .and_then(|v| v.changelog.clone())
+        .unwrap_or_default();
     let mc = changelog.lines().take(4).collect::<Vec<_>>().join("\n");
-    f.render_widget(Paragraph::new(format!("{mc}\nEnter choose   Esc back")).wrap(Wrap { trim: true }).style(super::dim()), foot);
+    f.render_widget(
+        Paragraph::new(format!("{mc}\nEnter choose   Esc back"))
+            .wrap(Wrap { trim: true })
+            .style(super::dim()),
+        foot,
+    );
 }
