@@ -75,13 +75,9 @@ pub async fn apply<P: Platform>(server: &Server, platform: &P, lock: &mut LockFi
         let hashes = src
             .download(&item.file, &dest, Box::new(move |done, total| p(Progress::Download { name: name.clone(), done, total })))
             .await
-            .map_err(|e| {
-                let _ = std::fs::remove_dir_all(&staging);
-                Error::Msg(format!("{}: download failed: {e}", item.name))
-            })?;
+            .map_err(|e| abort(&plugins_dir, &staging, &plan.tx_id, format!("{}: download failed: {e}", item.name)))?;
         if let Err(e) = verify(item, &hashes, &dest, platform) {
-            let _ = std::fs::remove_dir_all(&staging);
-            return Err(e);
+            return Err(abort(&plugins_dir, &staging, &plan.tx_id, e.to_string()));
         }
         staged.push((i, dest, hashes));
     }
@@ -161,7 +157,18 @@ pub async fn apply<P: Platform>(server: &Server, platform: &P, lock: &mut LockFi
     Ok(TxOutcome { tx_id: plan.tx_id.clone(), applied: manifest.items })
 }
 
+/// Clean up a transaction that failed before any swap: nothing on the server changed.
+fn abort(plugins_dir: &Path, staging: &Path, tx: &str, why: String) -> Error {
+    let _ = std::fs::remove_dir_all(staging);
+    let _ = journal::append(plugins_dir, &JournalEntry { time: chrono::Utc::now(), tx_id: tx.to_string(), action: "aborted".into(), outcome: why.clone(), items: vec![], note: Some("nothing was changed".into()) });
+    Error::Msg(why)
+}
+
 fn verify<P: Platform>(item: &super::PlanItem, got: &JarHashes, path: &Path, platform: &P) -> Result<()> {
+    // Test hook: MCPLUG_FAULT=hash makes every checksum mismatch, so the abort path can be exercised.
+    if std::env::var("MCPLUG_FAULT").as_deref() == Ok("hash") {
+        return Err(Error::Msg(format!("{}: checksum mismatch (injected by MCPLUG_FAULT)", item.name)));
+    }
     let expected = [(&item.file.sha512, &got.sha512), (&item.file.sha256, &got.sha256), (&item.file.sha1, &got.sha1)];
     for (want, have) in expected {
         if let Some(w) = want {
