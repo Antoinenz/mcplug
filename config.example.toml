@@ -1,0 +1,41 @@
+# mcplug configuration — see docs/CONFIGURATION.md. Secrets go in secrets.toml via `mcplug auth`.
+version = 1
+# contact = "you@example.com"
+
+[mcsmanager]
+enabled = true
+url = "http://127.0.0.1:23333"
+instance_config_dir = "/opt/mcsmanager/daemon/data/InstanceConfig"
+ignore = ["__MCSM_GLOBAL_INSTANCE__"]
+api_key_env_file = "/opt/mcbackup/env"
+
+# [[servers]]
+# id = "survival"
+# name = "Survival"
+# path = "/srv/mc/survival"
+# start_command = "java -Xmx4G -jar paper-26.2-123.jar nogui"
+# ping_port = 25565
+# [servers.control]
+# kind = "rcon"
+# port = 25575
+# password_ref = "survival"
+# restart_command = "systemctl restart mc-survival"
+
+[sources]
+modrinth = true
+hangar = true
+github = true
+geysermc = true
+
+[backup]
+mcbackup = "auto"
+
+[policy]
+check_interval = "6h"
+auto_apply = "same-mc-release"
+restart = "when-empty"
+restart_at = "04:30"
+countdown = 60
+quiet_hours = []
+geyser_auto = false
+backup = true
