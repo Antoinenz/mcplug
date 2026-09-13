@@ -78,6 +78,8 @@ enum Cmd {
         #[command(flatten)]
         flow: Flow,
     },
+    /// Run the scheduler: periodic checks and policy-driven automatic updates
+    Daemon,
     /// Store a token: `auth modrinth <PAT>`, `auth github <token>`, `auth mcsm <key>`, `auth rcon/<server> <pw>`; no value = show status
     Auth { what: Option<String>, value: Option<String> },
     /// Open the terminal UI (default)
@@ -128,6 +130,7 @@ async fn run(cli: Cli) -> mcplug::Result<()> {
         Cmd::Revert { server, tx } => mcplug::cli::update::revert(&ctx, &server, tx.as_deref()).await,
         Cmd::History { server } => mcplug::cli::update::history(&ctx, &server).await,
         Cmd::Jar { server, update, mc, check_only, yes, flow } => mcplug::cli::jar::run(&ctx, &mcplug::cli::jar::JarArgs { server, update, mc, check_only, yes, flow: flow.into() }).await,
+        Cmd::Daemon => mcplug::daemon::run(ctx).await,
         Cmd::Auth { what: None, .. } => mcplug::cli::auth::status(&ctx),
         Cmd::Auth { what: Some(w), value } => mcplug::cli::auth::set(&ctx, &w, value.as_deref()).await,
         Cmd::Servers => mcplug::cli::servers::run(&ctx).await,

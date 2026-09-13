@@ -71,9 +71,10 @@ fn status_bar(f: &mut Frame, state: &State, area: Rect) {
         Screen::Search => "type to search  Enter search/select  Esc close",
         Screen::Journal => "↑↓ move  r revert  Esc back",
     };
+    let daemon = crate::daemon::DaemonState::load(&crate::daemon::state::path()).describe();
     let line = match &state.toast {
         Some((t, _)) => Line::from(vec![Span::styled(format!(" {t} "), Style::default().fg(Color::Black).bg(Color::Yellow))]),
-        None => Line::from(Span::styled(format!(" {hints}"), Style::default().fg(Color::DarkGray))),
+        None => Line::from(vec![Span::styled(format!(" {hints}"), Style::default().fg(Color::DarkGray)), Span::styled(format!("   {daemon}"), Style::default().fg(Color::DarkGray))]),
     };
     f.render_widget(Paragraph::new(line), area);
 }

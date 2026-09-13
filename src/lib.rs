@@ -4,6 +4,7 @@ pub mod backup;
 pub mod cli;
 pub mod config;
 pub mod control;
+pub mod daemon;
 pub mod http;
 pub mod jobs;
 pub mod lockfile;
