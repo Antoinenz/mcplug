@@ -78,9 +78,24 @@ fn source_kind(entry: &PluginEntry) -> Option<SourceKind> {
     }
 }
 
-/// Pick the newest version that passes channel/ignore/compat rules.
+/// Is `latest` actually a different release than what's installed? Sources publish the same
+/// version number as separate files per loader (paper/purpur/folia), so a differing id with an
+/// identical version number is a sibling, not an update.
+fn is_newer(entry: &PluginEntry, latest: &ResolvedVersion) -> bool {
+    if Some(&latest.version_id) == installed_version_id(entry).as_ref() {
+        return false;
+    }
+    let installed = installed_label(entry);
+    installed == "unknown" || installed == "?" || installed != latest.version_number
+}
+
+/// Pick the newest version that passes channel/ignore/compat rules. Among versions published
+/// together for several loaders, the one listing the server's most specific loader wins.
 pub fn pick(versions: &[ResolvedVersion], entry: &PluginEntry, ctx: &CompatCtx) -> Option<(ResolvedVersion, Compat)> {
     let mut fallback: Option<(ResolvedVersion, Compat)> = None;
+    let mut versions: Vec<&ResolvedVersion> = versions.iter().collect();
+    let rank = |v: &ResolvedVersion| ctx.loaders.iter().position(|l| v.loaders.contains(l)).unwrap_or(usize::MAX);
+    versions.sort_by(|a, b| b.published.date_naive().cmp(&a.published.date_naive()).then(rank(a).cmp(&rank(b))));
     for v in versions {
         if !entry.channel.accepts(v.channel) || entry.ignored_versions.contains(&v.version_id) {
             continue;
@@ -136,7 +151,7 @@ pub async fn check(sources: &Sources, lock: &LockFile, base_ctx: &CompatCtx, ser
         if let Some(latest) = bulk.get(&entry.hashes.sha512) {
             let ok = entry.channel.accepts(latest.channel) && !entry.ignored_versions.contains(&latest.version_id);
             if ok {
-                if Some(&latest.version_id) != installed_version_id(entry).as_ref() {
+                if is_newer(entry, latest) {
                     report.updates.push(candidate(entry, latest.clone(), latest.compat(&ctx)));
                 } else {
                     report.up_to_date.push(entry.name.clone());
@@ -156,7 +171,7 @@ pub async fn check(sources: &Sources, lock: &LockFile, base_ctx: &CompatCtx, ser
         let ctx = base_ctx.with_mode(entry.compat, server_default);
         match src.versions(&pid, &ctx).await {
             Ok(versions) => match pick(&versions, entry, &ctx) {
-                Some((latest, compat)) if Some(&latest.version_id) != installed_version_id(entry).as_ref() => {
+                Some((latest, compat)) if is_newer(entry, &latest) => {
                     report.updates.push(candidate(entry, latest, compat));
                 }
                 Some(_) => report.up_to_date.push(entry.name.clone()),
