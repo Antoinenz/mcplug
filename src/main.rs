@@ -19,6 +19,15 @@ struct Cli {
 enum Cmd {
     /// List detected servers (MCSManager instances + manual entries)
     Servers,
+    /// Scan a server's plugins and identify them on Modrinth/Hangar/GeyserMC
+    Scan {
+        server: String,
+        /// Accept a candidate whose name matches exactly, even without a hash match
+        #[arg(long)]
+        accept_exact: bool,
+    },
+    /// Check for available updates
+    Check { server: Option<String> },
 }
 
 #[tokio::main]
@@ -37,5 +46,7 @@ async fn run(cli: Cli) -> mcplug::Result<()> {
     let ctx = mcplug::cli::Ctx { loaded, http, json: cli.json };
     match cli.cmd.unwrap_or(Cmd::Servers) {
         Cmd::Servers => mcplug::cli::servers::run(&ctx).await,
+        Cmd::Scan { server, accept_exact } => mcplug::cli::scan::run(&ctx, &mcplug::cli::scan::ScanArgs { server, accept_exact }).await,
+        Cmd::Check { server } => mcplug::cli::check::run(&ctx, server.as_deref()).await,
     }
 }
