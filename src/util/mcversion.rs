@@ -55,11 +55,14 @@ impl McVersion {
         self.pre.is_none()
     }
 
-    /// The "line" a version belongs to: the first two components (`1.21`, `26.2`).
-    /// Used for lenient compatibility ("a plugin built for 26.2 probably runs on 26.2.1").
+    /// The "line" a version belongs to, for lenient compatibility ("a plugin built for a
+    /// nearby version probably runs"). Classic scheme: major.minor (`1.21` covers 1.21–1.21.11).
+    /// Year scheme: the year (`26` covers 26.1–26.x), since each `26.x` drop is what a
+    /// `1.21.x` drop used to be.
     pub fn line(&self) -> McVersion {
+        let n = if self.parts.first().copied().unwrap_or(0) > 1 { 1 } else { 2 };
         McVersion {
-            parts: self.parts.iter().take(2).copied().collect(),
+            parts: self.parts.iter().take(n).copied().collect(),
             pre: None,
         }
     }
@@ -170,9 +173,12 @@ mod tests {
     fn lines() {
         assert!(v("26.2.1").same_line(&v("26.2")));
         assert!(v("1.21.8").same_line(&v("1.21.11")));
-        assert!(!v("26.1.2").same_line(&v("26.2")));
+        assert!(v("26.1.2").same_line(&v("26.2")));
+        assert!(!v("26.2").same_line(&v("27.1")));
         assert!(!v("1.20.6").same_line(&v("1.21")));
+        assert!(!v("1.21.11").same_line(&v("26.1")));
         assert_eq!(v("1.21.8").line().to_string(), "1.21");
+        assert_eq!(v("26.2.1").line().to_string(), "26");
     }
 
     #[test]

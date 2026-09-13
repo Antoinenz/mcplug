@@ -36,7 +36,7 @@ pub struct FlowArgs {
     pub no_backup: bool,
 }
 
-fn apply_options(ctx: &Ctx, server: &crate::server::Server, flow: &FlowArgs) -> Result<ops::ApplyOptions> {
+pub fn apply_options(ctx: &Ctx, server: &crate::server::Server, flow: &FlowArgs) -> Result<ops::ApplyOptions> {
     let restart = crate::control::RestartPolicy::parse(&flow.restart, flow.countdown).ok_or_else(|| Error::Msg(format!("--restart must be now, when-empty or never (got {:?})", flow.restart)))?;
     let control = ctx.control(server);
     if restart != crate::control::RestartPolicy::Never && !control.can_restart() {
@@ -193,7 +193,7 @@ fn describe_flow(opts: &ops::ApplyOptions) {
     );
 }
 
-fn confirm(q: &str) -> Result<bool> {
+pub fn confirm(q: &str) -> Result<bool> {
     use std::io::Write;
     print!("{q} [y/N] ");
     std::io::stdout().flush()?;

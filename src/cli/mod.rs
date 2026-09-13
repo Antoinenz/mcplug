@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod check;
+pub mod jar;
 pub mod scan;
 pub mod servers;
 pub mod update;

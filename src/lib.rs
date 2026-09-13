@@ -12,6 +12,7 @@ pub mod platform;
 pub mod plugins;
 pub mod error;
 pub mod server;
+pub mod serverjar;
 pub mod sources;
 pub mod transaction;
 pub mod tui;

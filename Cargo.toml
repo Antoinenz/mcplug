@@ -23,6 +23,7 @@ async-trait = "0.1"
 sha1 = "0.10"
 sha2 = "0.10"
 hex = "0.4"
+md-5 = "0.10"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 serde_yaml = "0.9"
 dirs = "6"
