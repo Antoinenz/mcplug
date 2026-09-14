@@ -78,6 +78,14 @@ enum Cmd {
         #[command(flatten)]
         flow: Flow,
     },
+    /// In-game bridge plugin: show status, or --install/--upgrade it into the server
+    Bridge {
+        server: String,
+        #[arg(long, alias = "upgrade")]
+        install: bool,
+        #[command(flatten)]
+        flow: Flow,
+    },
     /// Run the scheduler: periodic checks and policy-driven automatic updates
     Daemon,
     /// Store a token: `auth modrinth <PAT>`, `auth github <token>`, `auth mcsm <key>`, `auth rcon/<server> <pw>`; no value = show status
@@ -195,6 +203,8 @@ async fn run(cli: Cli) -> mcplug::Result<()> {
             )
             .await
         }
+        Cmd::Bridge { server, install: true, flow } => mcplug::cli::bridge::install(&ctx, &server, &flow.into()).await,
+        Cmd::Bridge { server, install: false, .. } => mcplug::cli::bridge::status(&ctx, &server).await,
         Cmd::Daemon => mcplug::daemon::run(ctx).await,
         Cmd::Auth { what: None, .. } => mcplug::cli::auth::status(&ctx),
         Cmd::Auth { what: Some(w), value } => mcplug::cli::auth::set(&ctx, &w, value.as_deref()).await,

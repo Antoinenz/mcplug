@@ -175,3 +175,70 @@ pub async fn apply_plan(
     }
     Ok(outcome)
 }
+
+/// Install (or upgrade) the McplugBridge plugin into a server: config with a unique port and
+/// token, the bundled jar, then a restart according to `restart`.
+pub async fn install_bridge(
+    server: &Server,
+    all_servers: &[Server],
+    daemon_port: u16,
+    control: &dyn crate::control::ServerControl,
+    restart: &crate::control::RestartPolicy,
+    progress: crate::transaction::ProgressFn,
+) -> Result<()> {
+    use crate::control::companion::{self, BridgeConfig};
+    if companion::JAR_BYTES.is_empty() {
+        return Err(Error::Msg(
+            "this mcplug build has no bundled McplugBridge jar (build companion/ with `mvn package` first, or use a release binary)".into(),
+        ));
+    }
+    if !server.access.writable() {
+        return Err(Error::Msg(format!("{}: plugin directory is not writable", server.name)));
+    }
+    let plugins_dir = server.plugins_dir();
+    let existing = BridgeConfig::load(&plugins_dir);
+    let (port, token) = match &existing {
+        Some(c) => (c.port, c.token.clone()),
+        None => {
+            let used: Vec<u16> = all_servers
+                .iter()
+                .filter(|s| s.id != server.id)
+                .filter_map(|s| BridgeConfig::load(&s.plugins_dir()).map(|c| c.port))
+                .collect();
+            (companion::free_port(&used), companion::new_token())
+        }
+    };
+    BridgeConfig::write(&plugins_dir, port, &token, daemon_port)?;
+    progress(crate::transaction::Progress::Step(format!("bridge config: port {port}")));
+    // replace any older bridge jar
+    let mut old = Vec::new();
+    for e in std::fs::read_dir(&plugins_dir)?.flatten() {
+        let n = e.file_name().to_string_lossy().to_string();
+        if n.starts_with(companion::PLUGIN_NAME) && n.ends_with(".jar") {
+            old.push(n);
+        }
+    }
+    let file = format!("{}-{}.jar", companion::PLUGIN_NAME, companion::JAR_VERSION);
+    std::fs::write(plugins_dir.join(&file), companion::JAR_BYTES)?;
+    for n in &old {
+        if n != &file {
+            let _ = std::fs::remove_file(plugins_dir.join(n));
+        }
+    }
+    progress(crate::transaction::Progress::Step(format!("installed {file}")));
+    let _ = crate::transaction::journal::append(
+        &plugins_dir,
+        &crate::transaction::journal::JournalEntry {
+            time: chrono::Utc::now(),
+            tx_id: crate::transaction::new_tx_id(),
+            action: "bridge".into(),
+            outcome: if existing.is_some() { "upgraded".into() } else { "installed".into() },
+            items: vec![],
+            note: Some(format!("port {port}")),
+        },
+    );
+    let log_progress = progress.clone();
+    let log = move |s: String| log_progress(crate::transaction::Progress::Step(s));
+    crate::control::execute_restart(control, restart, "installing the mcplug bridge", &log).await?;
+    Ok(())
+}

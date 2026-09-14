@@ -66,12 +66,12 @@ pub async fn execute_restart(control: &dyn ServerControl, policy: &RestartPolicy
     if control.can_console() && countdown > 0 {
         let marks: Vec<u32> = [60, 30, 10, 5, 3, 2, 1].into_iter().filter(|m| *m <= countdown).collect();
         let mut remaining = countdown;
-        let _ = control.broadcast(&format!("[mcplug] server restarts in {remaining}s — {reason}")).await;
+        let _ = control.countdown(remaining, reason).await;
         for m in marks {
             if m < remaining {
                 tokio::time::sleep(Duration::from_secs((remaining - m) as u64)).await;
                 remaining = m;
-                let _ = control.broadcast(&format!("[mcplug] restarting in {m}s")).await;
+                let _ = control.countdown(m, reason).await;
             }
         }
         tokio::time::sleep(Duration::from_secs(remaining as u64)).await;

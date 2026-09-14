@@ -163,6 +163,7 @@ impl App {
                 }
             }
             Msg::CollectionsLoaded { result } => self.on_collections_loaded(result),
+            Msg::BridgeDone { id, result } => self.on_bridge_done(id, result),
             Msg::JarStatus { result } => {
                 self.state.flow.jar_loading = false;
                 match result {
@@ -226,6 +227,7 @@ impl App {
                         self.refresh_server(i);
                     }
                 }
+                KeyCode::Char('b') => self.install_bridge(),
                 _ => {}
             },
             Screen::Detail => match k.code {

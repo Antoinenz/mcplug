@@ -70,7 +70,7 @@ pub fn render(f: &mut Frame, state: &mut State) {
 
 fn status_bar(f: &mut Frame, state: &State, area: Rect) {
     let hints = match state.screen {
-        Screen::Servers => "Enter open   r refresh   q quit   ? help",
+        Screen::Servers => "Enter open   b install in-game bridge   r refresh   q quit   ? help",
         Screen::Detail => "Enter actions   u update all   a add a plugin   Esc back   ? help",
         Screen::Actions => "Enter choose   Esc back",
         Screen::Identify => "↑↓ choose  Enter accept  m leave it alone  Esc cancel",

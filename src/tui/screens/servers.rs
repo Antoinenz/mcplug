@@ -44,6 +44,11 @@ pub fn render(f: &mut Frame, state: &mut State, area: Rect) {
                 Span::raw(v.players.map(|p| p.to_string()).unwrap_or_default()),
                 Span::raw(plugins),
                 updates,
+                if v.bridge {
+                    Span::styled("✓", Style::default().fg(Color::Green))
+                } else {
+                    Span::styled("–", super::dim())
+                },
                 access,
                 Span::styled(v.busy.unwrap_or("").to_string(), Style::default().fg(Color::Cyan)),
             ])
@@ -57,6 +62,7 @@ pub fn render(f: &mut Frame, state: &mut State, area: Rect) {
         Constraint::Length(8),
         Constraint::Length(8),
         Constraint::Length(8),
+        Constraint::Length(7),
         Constraint::Length(7),
         Constraint::Length(10),
     ];

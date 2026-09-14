@@ -1,6 +1,7 @@
 //! Talking to a running server: status, console commands, restarts.
 
 pub mod command;
+pub mod companion;
 pub mod mcsm;
 pub mod ping;
 pub mod rcon;
@@ -34,6 +35,10 @@ pub trait ServerControl: Send + Sync {
     /// Chat broadcast; default goes through `say`.
     async fn broadcast(&self, msg: &str) -> Result<()> {
         self.send_command(&format!("say {msg}")).await
+    }
+    /// A restart warning; the bridge shows a title, plain controls just say it.
+    async fn countdown(&self, seconds: u32, reason: &str) -> Result<()> {
+        self.broadcast(&format!("[mcplug] server restarts in {seconds}s — {reason}")).await
     }
     async fn stop(&self) -> Result<()>;
     async fn start(&self) -> Result<()>;

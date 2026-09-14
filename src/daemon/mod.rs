@@ -1,5 +1,6 @@
 //! `mcplug daemon`: periodic checks and policy-driven automatic updates.
 
+pub mod api;
 pub mod state;
 
 use std::sync::Arc;
@@ -25,9 +26,18 @@ pub async fn run(ctx: Ctx) -> Result<()> {
     let _lock = state::acquire_lock()?;
     let mut st = DaemonState::load(&state_path);
     tracing::info!("daemon starting; state in {}", state_path.display());
+    let busy: api::Busy = Arc::new(tokio::sync::Mutex::new(std::collections::HashSet::new()));
+    if ctx.loaded.config.daemon.api {
+        let api_ctx = Arc::new(Ctx {
+            loaded: ctx.loaded.clone(),
+            http: ctx.http.clone(),
+            json: false,
+        });
+        tokio::spawn(api::serve(api_ctx, busy.clone(), ctx.loaded.config.daemon.api_port));
+    }
     loop {
         let started = std::time::Instant::now();
-        if let Err(e) = tick(&ctx, &mut st).await {
+        if let Err(e) = tick(&ctx, &mut st, &busy).await {
             tracing::error!("tick failed: {e}");
         }
         st.heartbeat = Some(chrono::Utc::now());
@@ -38,7 +48,7 @@ pub async fn run(ctx: Ctx) -> Result<()> {
     }
 }
 
-async fn tick(ctx: &Ctx, st: &mut DaemonState) -> Result<()> {
+async fn tick(ctx: &Ctx, st: &mut DaemonState, busy: &api::Busy) -> Result<()> {
     let loaded = crate::config::Loaded::load(Some(ctx.loaded.dir.clone())).unwrap_or_else(|_| ctx.loaded.clone());
     let ctx = Ctx {
         loaded,
@@ -49,7 +59,7 @@ async fn tick(ctx: &Ctx, st: &mut DaemonState) -> Result<()> {
     let now = chrono::Utc::now();
     for server in discover(&ctx.loaded.config) {
         let policy = ctx.loaded.config.policy.for_server(&server.id);
-        if !policy.enabled {
+        if !policy.enabled || busy.lock().await.contains(&server.id) {
             continue;
         }
         let entry = st.servers.entry(server.id.clone()).or_default();

@@ -44,6 +44,10 @@ struct Envelope {
 }
 
 impl Mcsm {
+    pub fn http(&self) -> reqwest::Client {
+        self.http.clone()
+    }
+
     pub fn new(http: reqwest::Client, url: &str, api_key: &str) -> Self {
         Self {
             http,

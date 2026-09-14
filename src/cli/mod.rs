@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod bridge;
 pub mod check;
 pub mod jar;
 pub mod scan;

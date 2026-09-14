@@ -16,6 +16,21 @@ pub struct Config {
     pub sources: SourcesConfig,
     pub backup: BackupConfig,
     pub policy: Policy,
+    pub daemon: DaemonConfig,
+}
+
+/// The daemon's localhost API, used by the in-game `/mcplug` command (McplugBridge).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DaemonConfig {
+    pub api: bool,
+    pub api_port: u16,
+}
+
+impl Default for DaemonConfig {
+    fn default() -> Self {
+        Self { api: true, api_port: 25581 }
+    }
 }
 
 impl Default for Config {
@@ -28,6 +43,7 @@ impl Default for Config {
             sources: SourcesConfig::default(),
             backup: BackupConfig::default(),
             policy: Policy::default(),
+            daemon: DaemonConfig::default(),
         }
     }
 }

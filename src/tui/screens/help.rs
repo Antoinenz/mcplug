@@ -6,7 +6,7 @@ const HELP: &str = "\
  mcplug finds your servers, scans their plugins and checks for updates by itself.
  You mostly read the screen and press Enter.
 
- servers      Enter open   r re-check everything   q quit
+ servers      Enter open   b install the in-game bridge (/mcplug for ops)   r re-check   q quit
  plugins      ↑↓ choose    Enter actions for that plugin (update, pick a version, pin, ignore, identify…)
               u  update everything that has an update
               a  add a plugin (search Modrinth + Hangar, paste a URL, or Ctrl-L for your collections)

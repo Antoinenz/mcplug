@@ -59,6 +59,10 @@ pub enum Msg {
     JarDone {
         result: Result<String>,
     },
+    BridgeDone {
+        id: String,
+        result: Result<()>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -158,11 +162,13 @@ pub struct ServerView {
     pub busy: Option<&'static str>,
     pub last_error: Option<String>,
     pub checked_at: Option<std::time::Instant>,
+    pub bridge: bool,
 }
 
 impl ServerView {
     pub fn new(server: Server) -> Self {
         let lock = LockFile::load(&server.plugins_dir()).ok().flatten();
+        let bridge = crate::control::companion::BridgeConfig::load(&server.plugins_dir()).is_some();
         Self {
             server,
             lock,
@@ -173,6 +179,7 @@ impl ServerView {
             busy: None,
             last_error: None,
             checked_at: None,
+            bridge,
         }
     }
 }

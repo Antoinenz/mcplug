@@ -692,3 +692,58 @@ impl App {
         }
     }
 }
+
+// ---- bridge plugin ----
+
+impl App {
+    /// `b` on the server list: install/upgrade McplugBridge and restart when the server is empty.
+    pub fn install_bridge(&mut self) {
+        let Some(v) = self.state.current() else { return };
+        if v.busy.is_some() {
+            return;
+        }
+        let server = v.server.clone();
+        let id = server.id.clone();
+        let all: Vec<crate::server::Server> = self.state.servers.iter().map(|v| v.server.clone()).collect();
+        let control = crate::control::for_server(&server, self.state.mcsm.as_deref().cloned(), &self.state.loaded.secrets);
+        let restart = if control.can_restart() {
+            RestartPolicy::WhenEmpty {
+                max_wait: std::time::Duration::from_secs(4 * 3600),
+                countdown_secs: 15,
+            }
+        } else {
+            RestartPolicy::Never
+        };
+        let daemon_port = self.state.loaded.config.daemon.api_port;
+        let tx = self.jobs.clone();
+        self.state.flow.apply_log.clear();
+        self.state.flow.apply_log.push(format!("installing McplugBridge on {}", server.name));
+        self.state.flow.applying = true;
+        self.state.flow.last_tx = None;
+        self.state.screen = Screen::Applying;
+        if let Some(v) = self.state.current_mut() {
+            v.busy = Some("bridge…");
+        }
+        self.jobs.spawn(async move {
+            let progress: transaction::ProgressFn = Arc::new(move |p| {
+                if let Progress::Step(s) = p {
+                    tx.send(Msg::ApplyProgress(s));
+                }
+            });
+            let result = ops::install_bridge(&server, &all, daemon_port, control.as_ref(), &restart, progress).await;
+            Msg::BridgeDone { id, result }
+        });
+    }
+
+    pub fn on_bridge_done(&mut self, id: String, result: crate::Result<()>) {
+        self.state.flow.applying = false;
+        self.state.flow.apply_log.push(match &result {
+            Ok(()) => "done: the bridge is active. In-game: /mcplug (operators only).".into(),
+            Err(e) => format!("FAILED: {e}"),
+        });
+        if let Some(v) = self.state.by_id_mut(&id) {
+            v.busy = None;
+            v.bridge = crate::control::companion::BridgeConfig::load(&v.server.plugins_dir()).is_some();
+        }
+    }
+}
