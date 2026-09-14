@@ -125,7 +125,7 @@ It never auto-applies pre-releases, files without checksums, or versions that do
 
 ## Documentation
 
-| | |
+| url | description |
 |---|---|
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | every config and policy key, secrets, manual servers, the lockfile |
 | [docs/IDENTIFICATION.md](docs/IDENTIFICATION.md) | how jars are matched to projects, compatibility modes, channels, pins |
