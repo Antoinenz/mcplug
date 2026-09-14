@@ -1,0 +1,16 @@
+name: McplugBridge
+version: ${project.version}
+main: dev.antoinenz.mcplug.bridge.McplugBridge
+api-version: '1.21'
+author: Antoinenz
+description: Bridge between a Paper server and mcplug (plugin manager).
+website: https://github.com/Antoinenz/mcplug
+commands:
+  mcplug:
+    description: Talk to mcplug (operators only)
+    usage: /mcplug <status|check|update|restart>
+    permission: mcplug.admin
+permissions:
+  mcplug.admin:
+    description: Control mcplug for this server
+    default: op

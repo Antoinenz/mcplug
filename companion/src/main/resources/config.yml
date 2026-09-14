@@ -1,0 +1,7 @@
+# Written by mcplug when it installs the bridge; edit only if you know why.
+# The bridge listens on 127.0.0.1 only. The token is shared with mcplug and is what
+# authorises both directions of the conversation.
+port: 25580
+token: ""
+# Where the mcplug daemon listens for in-game commands (same token).
+daemon-url: http://127.0.0.1:25581
