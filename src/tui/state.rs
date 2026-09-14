@@ -74,6 +74,7 @@ pub enum Screen {
     Search,
     Journal,
     Jar,
+    Actions,
 }
 
 /// What the version picker is choosing a version for.
@@ -111,6 +112,40 @@ pub struct Flow {
     pub journal_selected: usize,
     pub jar: Option<crate::serverjar::ops::JarStatus>,
     pub jar_loading: bool,
+    pub actions: Vec<Action>,
+    pub action_selected: usize,
+}
+
+/// Entries of the per-plugin actions menu.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Action {
+    UpdateToLatest,
+    ChooseVersion,
+    Pin,
+    Unpin,
+    IgnoreLatest,
+    Identify,
+    Unmanage,
+    Manage,
+    History,
+    ServerJar,
+}
+
+impl Action {
+    pub fn label(&self, latest: Option<&str>) -> String {
+        match self {
+            Action::UpdateToLatest => format!("Update to {}", latest.unwrap_or("latest")),
+            Action::ChooseVersion => "Choose a version…".into(),
+            Action::Pin => "Pin — never offer updates".into(),
+            Action::Unpin => "Unpin".into(),
+            Action::IgnoreLatest => format!("Ignore {}", latest.unwrap_or("this release")),
+            Action::Identify => "Identify — pick the project this jar is from…".into(),
+            Action::Unmanage => "Leave this plugin alone (unmanaged)".into(),
+            Action::Manage => "Manage this plugin again".into(),
+            Action::History => "Server history".into(),
+            Action::ServerJar => "Server jar (Paper/Purpur builds)".into(),
+        }
+    }
 }
 
 pub struct ServerView {
@@ -122,6 +157,7 @@ pub struct ServerView {
     pub players: Option<u32>,
     pub busy: Option<&'static str>,
     pub last_error: Option<String>,
+    pub checked_at: Option<std::time::Instant>,
 }
 
 impl ServerView {
@@ -136,6 +172,7 @@ impl ServerView {
             players: None,
             busy: None,
             last_error: None,
+            checked_at: None,
         }
     }
 }
@@ -153,6 +190,8 @@ pub struct State {
     pub toast: Option<(String, std::time::Instant)>,
     pub loaded: Arc<crate::config::Loaded>,
     pub flow: Flow,
+    /// Where `?` was pressed, so closing help goes back there.
+    pub help_from: Screen,
 }
 
 impl State {

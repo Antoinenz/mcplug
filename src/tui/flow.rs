@@ -202,6 +202,8 @@ impl App {
         }
         self.state.flow.plan = None;
         self.refresh_status();
+        let i = self.state.selected;
+        self.refresh_server(i);
     }
 
     pub fn on_key_applying(&mut self, k: KeyEvent) {
@@ -246,6 +248,8 @@ impl App {
         if self.state.screen == Screen::Journal {
             self.load_journal();
         }
+        let i = self.state.selected;
+        self.refresh_server(i);
     }
 
     // ---- version picker ----
@@ -608,5 +612,83 @@ impl App {
             let result = crate::serverjar::ops::install_build(&server, control.as_ref(), &latest, &http, progress).await;
             Msg::JarDone { result }
         });
+    }
+}
+
+// ---- per-plugin actions menu ----
+
+impl App {
+    pub fn open_actions(&mut self) {
+        use super::state::Action;
+        use crate::lockfile::SourceRef;
+        let Some(name) = self.selected_plugin_name() else { return };
+        let Some(v) = self.state.current() else { return };
+        let Some(entry) = v.lock.as_ref().and_then(|l| l.get(&name)) else { return };
+        let has_update = v.check.as_ref().is_some_and(|c| c.updates.iter().any(|u| u.name == name));
+        let mut actions = Vec::new();
+        match &entry.source {
+            SourceRef::Unidentified => {
+                actions.push(Action::Identify);
+                actions.push(Action::Unmanage);
+            }
+            SourceRef::Unmanaged => actions.push(Action::Manage),
+            _ => {
+                if has_update {
+                    actions.push(Action::UpdateToLatest);
+                    actions.push(Action::IgnoreLatest);
+                }
+                actions.push(Action::ChooseVersion);
+                actions.push(if entry.pinned { Action::Unpin } else { Action::Pin });
+                actions.push(Action::Identify);
+                actions.push(Action::Unmanage);
+            }
+        }
+        actions.push(Action::History);
+        actions.push(Action::ServerJar);
+        self.state.flow.actions = actions;
+        self.state.flow.action_selected = 0;
+        self.state.screen = Screen::Actions;
+    }
+
+    pub fn on_key_actions(&mut self, k: KeyEvent) {
+        use super::state::Action;
+        let n = self.state.flow.actions.len();
+        match k.code {
+            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('h') => self.state.screen = Screen::Detail,
+            KeyCode::Char('j') | KeyCode::Down if n > 0 => self.state.flow.action_selected = (self.state.flow.action_selected + 1) % n,
+            KeyCode::Char('k') | KeyCode::Up if n > 0 => self.state.flow.action_selected = (self.state.flow.action_selected + n - 1) % n,
+            KeyCode::Enter if n > 0 => {
+                let action = self.state.flow.actions[self.state.flow.action_selected].clone();
+                self.state.screen = Screen::Detail;
+                match action {
+                    Action::UpdateToLatest => self.start_update_review(true),
+                    Action::ChooseVersion => self.open_versions_for_selected(),
+                    Action::Pin | Action::Unpin => self.toggle_pin(),
+                    Action::IgnoreLatest => self.ignore_latest(),
+                    Action::Identify => {
+                        // candidates come from the last scan; make sure we have fresh ones
+                        let has = self
+                            .selected_plugin_name()
+                            .and_then(|n| {
+                                self.state
+                                    .current()
+                                    .map(|v| v.undecided.iter().any(|u| u.jar.descriptor.as_ref().is_some_and(|d| d.name == n)))
+                            })
+                            .unwrap_or(false);
+                        if has {
+                            self.open_identify();
+                        } else {
+                            self.state.toast("looking for candidates — try again in a moment");
+                            let i = self.state.selected;
+                            self.refresh_server(i);
+                        }
+                    }
+                    Action::Unmanage | Action::Manage => self.toggle_unmanaged(),
+                    Action::History => self.load_journal(),
+                    Action::ServerJar => self.open_jar(),
+                }
+            }
+            _ => {}
+        }
     }
 }

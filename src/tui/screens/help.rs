@@ -3,20 +3,19 @@ use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
 const HELP: &str = "\
- servers      ↑↓ / j k  move      Enter  open server
-              s  scan plugins     c  check for updates    C  check every server
-              r  refresh status   q  quit
+ mcplug finds your servers, scans their plugins and checks for updates by itself.
+ You mostly read the screen and press Enter.
 
- plugins      s  scan (identify new jars)      c  check for updates
-              u  update…                        i  identify (choose the project for a ? jar)
-              m  toggle unmanaged (leave it alone)
-              p  toggle pin (never update)      x  ignore the offered version
-              Esc  back
+ servers      Enter open   r re-check everything   q quit
+ plugins      ↑↓ choose    Enter actions for that plugin (update, pick a version, pin, ignore, identify…)
+              u  update everything that has an update
+              a  add a plugin (search Modrinth + Hangar, paste a URL, or Ctrl-L for your collections)
+              r  re-check this server        Esc back
 
  glyphs       ↑ update available   ⇡ update outside declared compatibility   ✓ up to date
-              P pinned   ? unidentified   – unmanaged";
+              P pinned   ? unidentified (Enter to pick the project)   – unmanaged";
 
 pub fn render(f: &mut Frame, area: Rect) {
-    let inner = super::popup(f, area, 80, 16, "help");
+    let inner = super::popup(f, area, 84, 15, "help");
     f.render_widget(Paragraph::new(HELP), inner);
 }

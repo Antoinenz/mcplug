@@ -1,3 +1,4 @@
+mod actions;
 mod applying;
 mod detail;
 mod help;
@@ -59,15 +60,20 @@ pub fn render(f: &mut Frame, state: &mut State) {
             detail::render(f, state, body);
             jar::render(f, state, body);
         }
+        Screen::Actions => {
+            detail::render(f, state, body);
+            actions::render(f, state, body);
+        }
     }
     status_bar(f, state, bar);
 }
 
 fn status_bar(f: &mut Frame, state: &State, area: Rect) {
     let hints = match state.screen {
-        Screen::Servers => "↑↓ move  Enter open  s scan  c check  C check all  r refresh  ? help  q quit",
-        Screen::Detail => "↑↓ move  s scan  c check  u update  i identify  m unmanaged  p pin  x ignore  Esc back",
-        Screen::Identify => "↑↓ choose  Enter accept  m mark unmanaged  Esc cancel",
+        Screen::Servers => "Enter open   r refresh   q quit   ? help",
+        Screen::Detail => "Enter actions   u update all   a add a plugin   Esc back   ? help",
+        Screen::Actions => "Enter choose   Esc back",
+        Screen::Identify => "↑↓ choose  Enter accept  m leave it alone  Esc cancel",
         Screen::Help => "any key to close",
         Screen::Review => "Enter continue  v version  - drop  Esc cancel",
         Screen::Restart => "↑↓ choose  ←→ countdown  b backup  Enter apply  Esc back",
@@ -75,7 +81,7 @@ fn status_bar(f: &mut Frame, state: &State, area: Rect) {
         Screen::Versions => "↑↓ choose  Enter select  Esc back",
         Screen::Search => "type to search  Enter search/select  Esc close",
         Screen::Journal => "↑↓ move  r revert  Esc back",
-        Screen::Jar => "u update to newest build  Esc back",
+        Screen::Jar => "u update to newest build   Esc back",
     };
     let daemon = crate::daemon::DaemonState::load(&crate::daemon::state::path()).describe();
     let line = match &state.toast {

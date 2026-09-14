@@ -43,12 +43,17 @@ impl App {
             toast: None,
             loaded,
             flow: Default::default(),
+            help_from: Screen::Servers,
         };
         Self { state, jobs, rx }
     }
 
     pub async fn run<B: Backend>(mut self, terminal: &mut Terminal<B>) -> Result<()> {
         self.refresh_status();
+        // Everything scans and checks itself on start; the user just reads the result.
+        for i in 0..self.state.servers.len() {
+            self.refresh_server(i);
+        }
         let mut events = EventStream::new();
         let mut tick = tokio::time::interval(Duration::from_millis(250));
         let mut status_tick = tokio::time::interval(Duration::from_secs(30));
@@ -116,47 +121,29 @@ impl App {
                 }
             }
             Msg::ScanDone { id, result } => {
-                let mut note = None;
                 if let Some(v) = self.state.by_id_mut(&id) {
-                    v.busy = None;
                     match result {
                         Ok(out) => {
-                            note = Some(format!(
-                                "{}: {} plugins, {} identified, {} need a decision{}",
-                                v.server.name,
-                                out.lock.plugins.len(),
-                                out.report.identified.len(),
-                                out.report.undecided.len(),
-                                if out.saved { "" } else { " (read-only: lock not saved)" }
-                            ));
+                            v.busy = Some("checking…");
                             v.lock = Some(out.lock);
                             v.undecided = out.report.undecided;
                             v.last_error = out.report.errors.first().cloned();
                         }
                         Err(e) => {
+                            v.busy = None;
                             v.last_error = Some(e.to_string());
-                            note = Some(format!("scan failed: {e}"));
                         }
                     }
-                }
-                if let Some(n) = note {
-                    self.state.toast(n);
                 }
             }
             Msg::CheckDone { id, result } => {
-                let mut note = None;
                 if let Some(v) = self.state.by_id_mut(&id) {
                     v.busy = None;
+                    v.checked_at = Some(std::time::Instant::now());
                     match result {
-                        Ok(r) => {
-                            note = Some(format!("{}: {} update(s) available", v.server.name, r.updates.len()));
-                            v.check = Some(r);
-                        }
-                        Err(e) => note = Some(format!("check failed: {e}")),
+                        Ok(r) => v.check = Some(r),
+                        Err(e) => v.last_error = Some(format!("update check failed: {e}")),
                     }
-                }
-                if let Some(n) = note {
-                    self.state.toast(n);
                 }
             }
             Msg::PlanBuilt { id, result } => self.on_plan_built(id, result),
@@ -219,56 +206,47 @@ impl App {
             return;
         }
         match self.state.screen {
-            Screen::Help => {
-                self.state.screen = Screen::Servers;
-            }
+            Screen::Help => self.state.screen = self.state.help_from,
             Screen::Servers => match k.code {
                 KeyCode::Char('q') | KeyCode::Esc => self.state.should_quit = true,
-                KeyCode::Char('?') => self.state.screen = Screen::Help,
+                KeyCode::Char('?') => {
+                    self.state.help_from = Screen::Servers;
+                    self.state.screen = Screen::Help;
+                }
                 KeyCode::Char('j') | KeyCode::Down => self.move_sel(1),
                 KeyCode::Char('k') | KeyCode::Up => self.move_sel(-1),
                 KeyCode::Enter | KeyCode::Char('l') => {
                     self.state.plugin_selected = 0;
                     self.state.screen = Screen::Detail;
+                    self.refresh_if_stale();
                 }
-                KeyCode::Char('s') => self.scan_current(),
-                KeyCode::Char('c') => self.check_current(),
-                KeyCode::Char('r') => self.refresh_status(),
-                KeyCode::Char('C') => {
+                KeyCode::Char('r') => {
+                    self.refresh_status();
                     for i in 0..self.state.servers.len() {
-                        self.state.selected = i;
-                        self.check_current();
+                        self.refresh_server(i);
                     }
                 }
                 _ => {}
             },
             Screen::Detail => match k.code {
                 KeyCode::Char('q') | KeyCode::Esc | KeyCode::Char('h') => self.state.screen = Screen::Servers,
-                KeyCode::Char('?') => self.state.screen = Screen::Help,
+                KeyCode::Char('?') => {
+                    self.state.help_from = Screen::Detail;
+                    self.state.screen = Screen::Help;
+                }
                 KeyCode::Char('j') | KeyCode::Down => self.move_plugin(1),
                 KeyCode::Char('k') | KeyCode::Up => self.move_plugin(-1),
-                KeyCode::Char('s') => self.scan_current(),
-                KeyCode::Char('c') => self.check_current(),
-                KeyCode::Char('r') => self.refresh_status(),
-                KeyCode::Char('i') => self.open_identify(),
-                KeyCode::Char('m') => self.toggle_unmanaged(),
-                KeyCode::Char('p') => self.toggle_pin(),
-                KeyCode::Char('x') => self.ignore_latest(),
+                KeyCode::Enter => self.open_actions(),
                 KeyCode::Char('u') => self.start_update_review(false),
-                KeyCode::Char('U') => self.start_update_review(true),
-                KeyCode::Char('v') => self.open_versions_for_selected(),
-                KeyCode::Char('n') | KeyCode::Char('/') => self.open_search(),
-                KeyCode::Char('l') => self.load_journal(),
-                KeyCode::Char('J') => self.open_jar(),
+                KeyCode::Char('a') | KeyCode::Char('/') => self.open_search(),
+                KeyCode::Char('r') => {
+                    self.refresh_status();
+                    let i = self.state.selected;
+                    self.refresh_server(i);
+                }
                 _ => {}
             },
-            Screen::Jar => self.on_key_jar(k),
-            Screen::Review => self.on_key_review(k),
-            Screen::Restart => self.on_key_restart(k),
-            Screen::Applying => self.on_key_applying(k),
-            Screen::Versions => self.on_key_versions(k),
-            Screen::Search => self.on_key_search(k),
-            Screen::Journal => self.on_key_journal(k),
+            Screen::Actions => self.on_key_actions(k),
             Screen::Identify => match k.code {
                 KeyCode::Esc | KeyCode::Char('q') => self.state.screen = Screen::Detail,
                 KeyCode::Char('j') | KeyCode::Down => self.state.candidate_selected = self.state.candidate_selected.saturating_add(1),
@@ -280,6 +258,13 @@ impl App {
                 }
                 _ => {}
             },
+            Screen::Review => self.on_key_review(k),
+            Screen::Restart => self.on_key_restart(k),
+            Screen::Applying => self.on_key_applying(k),
+            Screen::Versions => self.on_key_versions(k),
+            Screen::Search => self.on_key_search(k),
+            Screen::Journal => self.on_key_journal(k),
+            Screen::Jar => self.on_key_jar(k),
         }
     }
 
@@ -299,38 +284,51 @@ impl App {
         self.state.plugin_selected = (self.state.plugin_selected as i32 + d).rem_euclid(n as i32) as usize;
     }
 
-    fn scan_current(&mut self) {
-        let Some(v) = self.state.current_mut() else { return };
-        if v.busy.is_some() {
+    /// Scan + check one server in a single background job.
+    pub(super) fn refresh_server(&mut self, idx: usize) {
+        let Some(v) = self.state.servers.get_mut(idx) else { return };
+        if v.busy.is_some() || !v.server.platform.is_bukkit() {
             return;
         }
-        v.busy = Some("scanning");
+        v.busy = Some("scanning…");
         let server = v.server.clone();
         let id = server.id.clone();
         let sources = self.state.sources.clone();
+        let tx = self.jobs.clone();
         self.jobs.spawn(async move {
-            let result = ops::scan_server(&server, &sources, false).await;
-            Msg::ScanDone { id, result }
+            let scanned = ops::scan_server(&server, &sources, false).await;
+            let lock = match &scanned {
+                Ok(out) => Some(out.lock.clone()),
+                Err(_) => None,
+            };
+            tx.send(Msg::ScanDone {
+                id: id.clone(),
+                result: scanned,
+            });
+            match lock {
+                Some(lock) => Msg::CheckDone {
+                    id,
+                    result: ops::check_server(&server, &sources, &lock).await,
+                },
+                None => Msg::CheckDone {
+                    id,
+                    result: Err(crate::Error::Msg("scan failed".into())),
+                },
+            }
         });
     }
 
-    fn check_current(&mut self) {
-        let Some(v) = self.state.current_mut() else { return };
-        if v.busy.is_some() {
-            return;
+    /// Opening a server re-checks if the last check is older than ten minutes.
+    fn refresh_if_stale(&mut self) {
+        let i = self.state.selected;
+        let stale = self
+            .state
+            .servers
+            .get(i)
+            .is_some_and(|v| v.checked_at.is_none_or(|t| t.elapsed() > Duration::from_secs(600)));
+        if stale {
+            self.refresh_server(i);
         }
-        let Some(lock) = v.lock.clone() else {
-            self.state.toast("scan first (s)");
-            return;
-        };
-        v.busy = Some("checking");
-        let server = v.server.clone();
-        let id = server.id.clone();
-        let sources = self.state.sources.clone();
-        self.jobs.spawn(async move {
-            let result = ops::check_server(&server, &sources, &lock).await;
-            Msg::CheckDone { id, result }
-        });
     }
 
     pub(super) fn selected_plugin_name(&self) -> Option<String> {
@@ -343,7 +341,7 @@ impl App {
             .map(|p| p.name.clone())
     }
 
-    fn open_identify(&mut self) {
+    pub(super) fn open_identify(&mut self) {
         let Some(name) = self.selected_plugin_name() else { return };
         let has = self
             .state
@@ -357,7 +355,7 @@ impl App {
         self.state.screen = Screen::Identify;
     }
 
-    fn accept_candidate(&mut self) {
+    pub(super) fn accept_candidate(&mut self) {
         let Some(name) = self.selected_plugin_name() else { return };
         let sel = self.state.candidate_selected;
         let Some(v) = self.state.current_mut() else { return };
@@ -377,7 +375,7 @@ impl App {
         self.state.screen = Screen::Detail;
     }
 
-    fn toggle_unmanaged(&mut self) {
+    pub(super) fn toggle_unmanaged(&mut self) {
         let Some(name) = self.selected_plugin_name() else { return };
         let Some(v) = self.state.current_mut() else { return };
         let Some(lock) = v.lock.as_mut() else { return };
@@ -395,7 +393,7 @@ impl App {
         self.state.toast(msg);
     }
 
-    fn toggle_pin(&mut self) {
+    pub(super) fn toggle_pin(&mut self) {
         let Some(name) = self.selected_plugin_name() else { return };
         let Some(v) = self.state.current_mut() else { return };
         let Some(lock) = v.lock.as_mut() else { return };
@@ -409,7 +407,7 @@ impl App {
         self.state.toast(msg);
     }
 
-    fn ignore_latest(&mut self) {
+    pub(super) fn ignore_latest(&mut self) {
         let Some(name) = self.selected_plugin_name() else { return };
         let Some(v) = self.state.current_mut() else { return };
         let Some(latest) = v

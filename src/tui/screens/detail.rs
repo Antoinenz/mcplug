@@ -93,11 +93,16 @@ pub fn render(f: &mut Frame, state: &mut State, area: Rect) {
         Constraint::Min(20),
     ];
     let n_updates = v.check.as_ref().map(|c| c.updates.len()).unwrap_or(0);
-    let title = format!(
-        " plugins ({})  {} ",
-        lock.plugins.len(),
-        if n_updates > 0 { format!("{n_updates} updates") } else { String::new() }
-    );
+    let title = match (v.busy, n_updates) {
+        (Some(b), _) => format!(" plugins ({}) — {b} ", lock.plugins.len()),
+        (None, 0) if v.check.is_some() => format!(" plugins ({}) — all up to date ", lock.plugins.len()),
+        (None, n) if n > 0 => format!(
+            " plugins ({}) — {n} update{} available, u to apply ",
+            lock.plugins.len(),
+            if n == 1 { "" } else { "s" }
+        ),
+        _ => format!(" plugins ({}) ", lock.plugins.len()),
+    };
     let table = Table::new(rows, widths)
         .header(header)
         .block(Block::default().borders(Borders::ALL).title(title))
@@ -113,8 +118,8 @@ pub fn render(f: &mut Frame, state: &mut State, area: Rect) {
             SourceRef::Hangar { slug, .. } => format!("hangar {slug}"),
             SourceRef::GitHub { owner, repo, asset_glob, .. } => format!("github {owner}/{repo} ({asset_glob})"),
             SourceRef::GeyserMc { project, .. } => format!("geysermc {project}"),
-            SourceRef::Unidentified => "unidentified — press i to choose a source, m to leave it alone".into(),
-            SourceRef::Unmanaged => "unmanaged — press m to identify it again".into(),
+            SourceRef::Unidentified => "not found by hash — Enter to pick the project it comes from".into(),
+            SourceRef::Unmanaged => "unmanaged — Enter to manage it again".into(),
         };
         foot_lines.push(Line::from(vec![
             Span::styled(format!(" {} ", p.name), Style::default().add_modifier(Modifier::BOLD)),
