@@ -68,3 +68,20 @@ and only proceeds without `--check-only`. Both go through the same restart/backu
 `plugins/.mcplug/journal.jsonl`, one JSON object per line: time, transaction id, action
 (`update` `install` `revert` `aborted` `restart` `backup` `server-jar`), outcome, items, note.
 `mcplug history <server>` prints it; the TUI's `l` shows it with revert on `r`.
+
+## The in-game bridge
+
+`McplugBridge` (in `companion/`, bundled into release binaries) runs a plain-JDK HTTP listener on
+`127.0.0.1:<port>` (`plugins/McplugBridge/config.yml`, written by mcplug: `port`, `token`,
+`daemon-url`). mcplug calls `GET /status` (players, TPS, MSPT, version), `POST /countdown`
+(chat + title + action bar), `POST /broadcast`, `POST /notify` (ops + console), all with
+`Authorization: Bearer <token>`. When the bridge is present the `Companion` control wraps the base
+control (MCSManager/RCON/command), so restarts still go through the panel while messages and
+readiness go through the plugin.
+
+`/mcplug <status|check|update [plugin|all]|restart>` (permission `mcplug.admin`, default op) POSTs
+to the daemon's `/v1/command` on `127.0.0.1:25581` with the same token. The daemon looks the token
+up across the servers it knows and acts on that server only; unknown tokens get 401. `update`
+plans and applies with restart-when-empty in the background and reports back through `/notify`;
+`restart` runs the usual countdown. The daemon skips its own tick for a server while an in-game
+command is working on it.

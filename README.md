@@ -20,6 +20,7 @@ Point it at a server directory — or let it discover every [MCSManager](https:/
 - **[mcbackup](https://github.com/Antoinenz/mcbackup) aware** — a pinned checkpoint before, a snapshot after, so a bad update can be undone at the world level too
 - **Server jar too** — Paper/Purpur builds identified by hash, same-version build updates, and Minecraft upgrades that first show you which plugins have a compatible version and whether your Java is new enough
 - **Daemon** — periodic checks, auto-apply scopes (none / same-Minecraft-version releases / everything), scheduled restarts, quiet hours
+- **In-game bridge** — one key installs the bundled McplugBridge plugin: titled restart countdowns, ops-only notices, live player/TPS data, and `/mcplug status|check|update|restart` for operators, scoped to that one server
 - **Scriptable** — every TUI action is also a CLI command with `--json` output and meaningful exit codes
 
 ## Installation
@@ -75,12 +76,12 @@ mcplug jar <server> [--update] [--mc 26.3 [--check-only]]
 mcplug daemon
 ```
 
-In the TUI:
+The TUI does the scanning and checking by itself; you read the screen and press Enter:
 
 ```
-servers   Enter open   s scan   c check   C check all
-plugins   u update all   U update this one   v any version   n install (search / URL / Ctrl-L collections)
-          i identify   m unmanaged   p pin   x ignore this release   l history   J server jar
+servers   Enter open        b install the in-game bridge        r re-check
+plugins   Enter actions for a plugin (update, choose a version, pin, ignore, identify…)
+          u update everything     a add a plugin (search / URL / Ctrl-L collections)
 ```
 
 ```
@@ -122,6 +123,22 @@ auto_apply = "none"
 ```
 
 It never auto-applies pre-releases, files without checksums, or versions that don't declare your Minecraft version. Everything it does lands in the server's journal, visible in the TUI (`l`).
+
+## In-game
+
+Press `b` on a server (or `mcplug bridge <server> --install`). mcplug writes a config with a unique
+localhost port and token, drops the bundled `McplugBridge` jar into `plugins/`, and restarts when the
+server is empty. From then on restart warnings show as titles and action-bar text, and operators get:
+
+```
+/mcplug status            what mcplug knows about this server, pending updates
+/mcplug check             look for updates now
+/mcplug update [plugin]   apply updates; the server restarts once nobody is online
+/mcplug restart           restart now with a countdown
+```
+
+The command talks to the mcplug daemon on `127.0.0.1:25581` with the server's own token, so an
+operator can only ever act on the server they're standing in. Permission `mcplug.admin`, default op.
 
 ## Documentation
 
