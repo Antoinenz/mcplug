@@ -200,11 +200,12 @@ pub async fn install_bridge(
     let (port, token) = match &existing {
         Some(c) => (c.port, c.token.clone()),
         None => {
-            let used: Vec<u16> = all_servers
+            let mut used: Vec<u16> = all_servers
                 .iter()
                 .filter(|s| s.id != server.id)
                 .filter_map(|s| BridgeConfig::load(&s.plugins_dir()).map(|c| c.port))
                 .collect();
+            used.push(daemon_port); // the daemon's own API must never collide with a bridge
             (companion::free_port(&used), companion::new_token())
         }
     };
